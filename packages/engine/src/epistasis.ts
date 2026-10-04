@@ -54,8 +54,7 @@ export const EPISTASIS: readonly EpistasisRule[] = [
     id: 'colour.carotenoid.base',
     when: (p) =>
       winner(p, 'pigment.carotenoid') !== 'none' &&
-      winner(p, 'pigment.anthocyanidin') === 'none' &&
-      winner(p, 'pigment.petal.chlorophyll') === 'none',
+      winner(p, 'pigment.anthocyanidin') === 'none',
     apply: (p) => {
       const branch = winner(p, 'pigment.carotenoid')
       p.quantitative['pigment.hue'] = CAROTENOID_HUE[branch] ?? 50
@@ -67,8 +66,7 @@ export const EPISTASIS: readonly EpistasisRule[] = [
     id: 'colour.carotenoid.overlay',
     when: (p) =>
       winner(p, 'pigment.carotenoid') !== 'none' &&
-      winner(p, 'pigment.anthocyanidin') !== 'none' &&
-      winner(p, 'pigment.petal.chlorophyll') === 'none',
+      winner(p, 'pigment.anthocyanidin') !== 'none',
     apply: (p) => {
       // Anthocyanin laid over yellow reads as bronze, brick or russet.
       const branch = winner(p, 'pigment.carotenoid')
@@ -84,8 +82,11 @@ export const EPISTASIS: readonly EpistasisRule[] = [
     },
   },
   {
-    id: 'colour.petal.chlorophyll',
-    when: (p) => winner(p, 'pigment.petal.chlorophyll') === 'green',
+    id: 'colour.petal.chlorophyll.pure',
+    when: (p) =>
+      winner(p, 'pigment.petal.chlorophyll') === 'green' &&
+      winner(p, 'pigment.anthocyanidin') === 'none' &&
+      winner(p, 'pigment.carotenoid') === 'none',
     apply: (p) => {
       p.quantitative['pigment.hue'] = 104
       p.quantitative['pigment.saturation'] = 0.32
@@ -93,11 +94,30 @@ export const EPISTASIS: readonly EpistasisRule[] = [
     },
   },
   {
+    id: 'colour.petal.chlorophyll.overlay',
+    when: (p) =>
+      winner(p, 'pigment.petal.chlorophyll') === 'green' &&
+      (winner(p, 'pigment.anthocyanidin') !== 'none' ||
+        winner(p, 'pigment.carotenoid') !== 'none'),
+    apply: (p) => {
+      // Chlorophyll absorbs light rather than replacing pigment. A petal that
+      // carries both reads darker and muddier, not green. Green petals proper
+      // are the pure case above, which is why the two rules are separate.
+      p.quantitative['pigment.saturation'] = Math.max(
+        0.12,
+        trait(p, 'pigment.saturation') * 0.45,
+      )
+      p.quantitative['pigment.lightness'] = Math.max(
+        0.18,
+        trait(p, 'pigment.lightness') * 0.6,
+      )
+    },
+  },
+  {
     id: 'colour.copigment.shift',
     when: (p) =>
       trait(p, 'pigment.copigment') > 0.45 &&
-      winner(p, 'pigment.anthocyanidin') !== 'none' &&
-      winner(p, 'pigment.petal.chlorophyll') !== 'green',
+      winner(p, 'pigment.anthocyanidin') !== 'none',
     apply: (p) => {
       const strength = Math.min(1, (trait(p, 'pigment.copigment') - 0.45) / 0.55)
       p.quantitative['pigment.hue'] = rotateHue(
@@ -115,8 +135,7 @@ export const EPISTASIS: readonly EpistasisRule[] = [
     id: 'colour.vacuolar.ph.shift',
     when: (p) =>
       trait(p, 'pigment.vacuolar.ph') > 0.5 &&
-      winner(p, 'pigment.anthocyanidin') === 'delphinidin' &&
-      winner(p, 'pigment.petal.chlorophyll') !== 'green',
+      winner(p, 'pigment.anthocyanidin') === 'delphinidin',
     apply: (p) => {
       // Only the delphinidin branch can be pushed to true blue. This is the
       // real constraint: there was no blue rose until the pathway was

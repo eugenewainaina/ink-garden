@@ -119,12 +119,31 @@ describe('the colour pathway', () => {
     expect(yellow.quantitative['pigment.saturation']).toBeGreaterThan(0.3)
   })
 
-  it('gives a green flower with petal chlorophyll and carotenoid', () => {
+  it('gives a pure green flower when chlorophyll is the only pigment', () => {
     const p = withWinner(base(), 'pigment.petal.chlorophyll', 'green', 1)
-    withWinner(p, 'pigment.carotenoid', 'yellow', 1)
     const green = applyEpistasis(p)
     expect(green.quantitative['pigment.hue']).toBeGreaterThan(70)
     expect(green.quantitative['pigment.hue']).toBeLessThan(150)
+  })
+
+  it('darkens and muddies a pigmented petal rather than greening it', () => {
+    const p = withWinner(base(), 'pigment.anthocyanidin', 'delphinidin', 3)
+    withWinner(p, 'pigment.petal.chlorophyll', 'green', 1)
+    const muddy = applyEpistasis(p)
+    // Hue must still read as violet. Chlorophyll absorbs, it does not repaint.
+    expect(muddy.quantitative['pigment.hue']).toBeGreaterThan(250)
+    expect(muddy.quantitative['pigment.hue']).toBeLessThan(310)
+    expect(muddy.quantitative['pigment.saturation']).toBeLessThan(0.2)
+    expect(muddy.quantitative['pigment.lightness']).toBeLessThan(0.5)
+  })
+
+  it('keeps a yellow flower yellow-green, not pure green', () => {
+    const p = withWinner(base(), 'pigment.carotenoid', 'yellow', 1)
+    withWinner(p, 'pigment.petal.chlorophyll', 'green', 1)
+    const olive = applyEpistasis(p)
+    expect(olive.quantitative['pigment.hue']).toBeGreaterThan(35)
+    expect(olive.quantitative['pigment.hue']).toBeLessThan(70)
+    expect(olive.quantitative['pigment.saturation']).toBeLessThan(0.4)
   })
 })
 
