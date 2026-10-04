@@ -24,14 +24,16 @@ const fixture: SpeciesTemplate = {
   lineage: 'Testus',
   lifecycle: 'perennial',
   daysToBloom: 40,
-  thermalBase: 5,
-  thermalConstant: 700,
   baseline: {
     petalCount: 5,
     stature: 4,
     leafSize: 3,
     flowerSize: 2,
     stemThickness: 1,
+    thermalBase: 5,
+    thermalConstant: 700,
+    criticalDaylength: 13,
+    vernalizationHours: 100,
   },
   distributions: {
     'thorn.presence': [0.95, 0.05],
@@ -297,7 +299,11 @@ describe('species baselines', () => {
 
   it('gives the tree a far larger thermal budget than the herb', () => {
     // A jacaranda takes years to flower from seed; a dandelion takes weeks.
-    expect(JACARANDA.thermalConstant).toBeGreaterThan(DANDELION.thermalConstant * 10)
-    expect(SPEARMINT.thermalConstant).toBeGreaterThan(DANDELION.thermalConstant)
+    expect(JACARANDA.baseline.thermalConstant).toBeGreaterThan(
+      DANDELION.baseline.thermalConstant * 10,
+    )
+    expect(SPEARMINT.baseline.thermalConstant).toBeGreaterThan(
+      DANDELION.baseline.thermalConstant,
+    )
   })
 })

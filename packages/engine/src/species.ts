@@ -24,6 +24,20 @@ export interface PhenotypeBaseline {
   readonly flowerSize: number
   /** Typical stem thickness in relative units. */
   readonly stemThickness: number
+  /**
+   * Phenology. Heritable, but bounded around the species value, so a breeder
+   * can select an early line or a late line without a species losing its
+   * character. These live here rather than on the template so that there is
+   * exactly one source for each fact.
+   */
+  /** Base temperature for thermal time, in Celsius. */
+  readonly thermalBase: number
+  /** Growing degree days from germination to bloom. */
+  readonly thermalConstant: number
+  /** Critical daylength in hours. */
+  readonly criticalDaylength: number
+  /** Chilling hours required before flowering. */
+  readonly vernalizationHours: number
 }
 
 /**
@@ -39,14 +53,11 @@ export interface SpeciesTemplate {
   readonly lineage: string
   readonly lifecycle: Lifecycle
   /**
-   * Nominal days to bloom at a mild temperature. Phenology proper is M0b; the
-   * thermal fields below are what M0b consumes.
+   * Nominal days to bloom at a mild temperature, for display and for a rough
+   * sanity check. The authoritative figures are the thermal fields in
+   * `baseline`, which M0b consumes.
    */
   readonly daysToBloom: number
-  /** Base temperature for thermal time, in Celsius. */
-  readonly thermalBase: number
-  /** Thermal constant: growing degree days from germination to bloom. */
-  readonly thermalConstant: number
   readonly baseline: PhenotypeBaseline
   readonly distributions: Readonly<Record<string, readonly number[]>>
 }
@@ -126,14 +137,16 @@ export const ROSEMARY: SpeciesTemplate = {
   lineage: 'Salvia',
   lifecycle: 'perennial',
   daysToBloom: 240,
-  thermalBase: 6,
-  thermalConstant: 1400,
   baseline: {
     petalCount: 5,
     stature: 3,
     leafSize: 1.5,
     flowerSize: 1,
     stemThickness: 1.5,
+    thermalBase: 6,
+    thermalConstant: 1400,
+    criticalDaylength: 12,
+    vernalizationHours: 100,
   },
   distributions: {
     'leaf.form': [0.95, 0.05, 0, 0, 0],
@@ -162,8 +175,6 @@ export const DANDELION: SpeciesTemplate = {
   lineage: 'Taraxacum',
   lifecycle: 'perennial',
   daysToBloom: 45,
-  thermalBase: 4,
-  thermalConstant: 420,
   baseline: {
     // A head of roughly fifty ligulate florets, not five petals.
     petalCount: 50,
@@ -171,6 +182,10 @@ export const DANDELION: SpeciesTemplate = {
     leafSize: 4,
     flowerSize: 2.5,
     stemThickness: 0.4,
+    thermalBase: 4,
+    thermalConstant: 420,
+    criticalDaylength: 13,
+    vernalizationHours: 100,
   },
   distributions: {
     'leaf.form': [0.9, 0.1, 0, 0, 0],
@@ -198,14 +213,16 @@ export const SPEARMINT: SpeciesTemplate = {
   lineage: 'Mentha',
   lifecycle: 'perennial',
   daysToBloom: 90,
-  thermalBase: 5,
-  thermalConstant: 700,
   baseline: {
     petalCount: 5,
     stature: 2,
     leafSize: 2.5,
     flowerSize: 0.5,
     stemThickness: 0.4,
+    thermalBase: 5,
+    thermalConstant: 700,
+    criticalDaylength: 14,
+    vernalizationHours: 150,
   },
   distributions: {
     'leaf.form': [1, 0, 0, 0, 0],
@@ -233,14 +250,16 @@ export const JACARANDA: SpeciesTemplate = {
   lineage: 'Jacaranda',
   lifecycle: 'perennial',
   daysToBloom: 2900,
-  thermalBase: 10,
-  thermalConstant: 18_000,
   baseline: {
     petalCount: 5,
     stature: 20,
     leafSize: 6,
     flowerSize: 3,
     stemThickness: 8,
+    thermalBase: 10,
+    thermalConstant: 18000,
+    criticalDaylength: 12,
+    vernalizationHours: 200,
   },
   distributions: {
     'leaf.form': [0, 0.05, 0.95, 0, 0],

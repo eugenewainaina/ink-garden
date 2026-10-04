@@ -11,14 +11,16 @@ const base = (petalCount: number, stature: number): SpeciesTemplate => ({
   lineage: 'Testus',
   lifecycle: 'perennial',
   daysToBloom: 60,
-  thermalBase: 5,
-  thermalConstant: 600,
   baseline: {
     petalCount,
     stature,
     leafSize: 3,
     flowerSize: 2,
     stemThickness: 1,
+    thermalBase: 5,
+    thermalConstant: 600,
+    criticalDaylength: 13,
+    vernalizationHours: 100,
   },
   distributions: {},
 })

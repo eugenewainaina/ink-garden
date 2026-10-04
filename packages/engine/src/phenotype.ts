@@ -154,6 +154,12 @@ const SCALED_BY_BASELINE: ReadonlyArray<{
   { trait: 'flower.diameter', field: 'flowerSize' },
   { trait: 'petal.length', field: 'flowerSize' },
   { trait: 'petal.width', field: 'flowerSize' },
+  // Phenology is heritable but bounded, exactly like morphology: the species
+  // sets the value and the genome moves it within the spread.
+  { trait: 'thermal.base_temp', field: 'thermalBase' },
+  { trait: 'thermal.constant', field: 'thermalConstant' },
+  { trait: 'photoperiod.critical', field: 'criticalDaylength' },
+  { trait: 'vernalization.hours', field: 'vernalizationHours' },
 ]
 
 /** How far cryptic petal-number variation can shift the canalised value. */
