@@ -1,8 +1,10 @@
 # Ink Garden — Design Specification
 
 **Date:** 2026-10-03
-**Revision:** 2 — supersedes revision 1 entirely. The genome, growth, weather and
-acquisition models were substantially redesigned after review.
+**Revision:** 3 — supersedes revisions 1 and 2. Revision 2 redesigned the genome,
+growth, weather and acquisition models. Revision 3 changes the platform and
+notification model, and replaces the infinite scroll with bounded, expandable
+beds.
 **Status:** Approved design, not yet implemented
 **Working name:** Ink Garden (provisional; see Open Questions)
 
@@ -33,7 +35,7 @@ committed.** See §14.
 |---|---|
 | `nonflowers` | The look: procedural brushwork, ink and wash. And the key lesson that good procedural flowers sample from a *constrained* space, not from everywhere |
 | `fishdraw` | Deterministic seed → artwork, seed doubles as the name, polyline output, self-drawing animation |
-| `shan-shui-inf` | The frame: an infinitely scrolling generated landscape rather than a grid |
+| `shan-shui-inf` | The origin of the handscroll garden view: a scrolling landscape with depth layering, in SVG. Its **infinity was rejected** for this product (§9.1), because a garden accumulates content where a screensaver does not |
 | **PlantStudio** (Kurtz-Fernhout, 1995–2002, GPL, [source](https://github.com/pdfernhout/PlantStudio), [writeup](https://pketh.org/plantstudio.html)) | A botany simulator by a biologist and an ecologist. Its flowering and fruiting submodel was translated from **EPIC, the USDA Agricultural Research Service crop model**, so its phenology is weather-driven. It ships a **Breeder** with similarity and mutation controls, a 10-step Plant Wizard that teaches botanical terms, and a "change age" feature that re-derives a plant at any point in its life. It also scoped itself to herbaceous plants |
 | [kiss_the_sky](https://github.com/matthewmain/kiss_the_sky) | A browser game built on a "programmatic replica of Mendelian genetics": genes, alleles, mutation, sexual reproduction, cross-pollination, seasons, and an ambient mode that runs for days |
 | [The Algorithmic Beauty of Plants](https://algorithmicbotany.org/) | The canonical reference: parametric L-systems, phyllotaxis, and developmental models of plants |
@@ -83,7 +85,14 @@ Product invariants. Implementation may change freely; these may not.
 9. **No accounts are required to view one's own garden.** Local data is the
    source of truth for the UI; the server is a durable mirror.
 10. **No forced re-authentication.**
-11. **No notifications.**
+11. **Notifications are event-only and never absence-driven.** The app may tell a
+    user that something *happened*: a bloom started, a seed is ready, a pollinator
+    brought something, a frost is coming. It may **never** generate a message
+    because the user was *absent*. No reminders, no streaks, no "your garden
+    misses you", no re-engagement of any kind. At most one notification a day,
+    and silence on days when nothing happened, which is most days. Each type is
+    individually toggleable, and permission is requested in response to a
+    deliberate tap. See §9.5.
 12. **No caterpillars or larval life stages.** Pollinators appear as adults only.
 13. **The full genome is visible from the start.** Every locus, every allele,
     every label. No fog, no locked traits, no withheld data. Biology is explained
@@ -117,6 +126,7 @@ untestable.
 │  local store (IndexedDB) = source of truth for the UI    │
 │  solar math (local, no network) = day/night lighting     │
 │  renderer (canvas) + SVG export                          │
+│  service worker: offline cache, Web Push, app badge      │
 └──────────────────────────────┬───────────────────────────┘
                                │ Supabase JS
                                ▼
@@ -127,7 +137,8 @@ untestable.
                                │ service role
 ┌──────────────────────────────┴───────────────────────────┐
 │  Vercel: static hosting + one daily cron                 │
-│  1. keep-warm  2. weather fetch + backfill  3. backups    │
+│  1. keep-warm  2. weather fetch + backfill               │
+│  3. backups    4. event notifications (VAPID web push)   │
 └──────────────────────────────┬───────────────────────────┘
                                │ Open-Meteo (no API key)
 ```
@@ -154,6 +165,15 @@ requirement: the client must have weather rows covering `planted_at` to now. The
 cron is responsible for completeness, including backfilling gaps from Open-Meteo's
 historical archive. See §7.5.
 
+**The platform is the PWA, not a native app.** iOS and iPadOS 16.4+ support Web
+Push and the Badging API for Home Screen web apps, delivered over APNs, with **no
+Apple Developer Program membership required**. That covers the app, offline use,
+notifications and a live icon badge, with nothing that expires. Apple exposes no
+web API for widgets, so a native widget extension is the only feature that would
+require leaving the platform; it is deferred to its own phase (§15.2) rather than
+paid for now, because every native distribution route expires and would turn the
+product into a maintenance obligation.
+
 ### Stack
 
 | Concern | Choice |
@@ -162,7 +182,8 @@ historical archive. See §7.5.
 | Monorepo | pnpm workspaces: `packages/engine`, `apps/web` |
 | UI | Vite + React |
 | Rendering | Canvas 2D, with an SVG export path |
-| PWA | `vite-plugin-pwa` (Workbox) |
+| PWA | `vite-plugin-pwa` (Workbox). Home Screen install, offline, no Apple Developer Program required |
+| Notifications | Web Push (VAPID) sent by the cron, plus the Badging API. Event-only, see §9.5 |
 | Local store | IndexedDB |
 | Database + auth | Supabase (Postgres, RLS, email OTP) |
 | Hosting | Vercel (static) + Vercel Cron |
@@ -636,11 +657,32 @@ An SVG export of the card accompanies the plant's wallpaper export.
 
 ### 9.1 Garden view
 
-Not a grid of pots. **A single continuous landscape scrolled horizontally**, like
-a handscroll, with depth layers and beds along the ground. It opens where
-something last changed, so a returning user never hunts for the new thing.
+Not a grid of pots. **A landscape scrolled horizontally**, like a handscroll, with
+depth layers and beds along the ground. It opens where something last changed, so
+a returning user never hunts for the new thing.
 
 Because plants are perennial and perennials grow, the garden visibly matures.
+
+**The garden is bounded but expandable, not infinite.** Revision 2 inherited an
+infinite scroll from the `shan-shui-inf` reference. That reference is infinite
+because it is a screensaver with no content and no destination; a garden
+accumulates plants, so an unbounded axis buys open space and charges a navigation
+problem in return, along with questions that have no good answers: what is at the
+end of it, how does a user zoom out at four hundred plants, and at what point does
+the overview become an unreadable smear. Instead the garden has a finite visible
+extent, and filling it is answered by deliberately extending it, like taking on
+another bed.
+
+**Two ways to find things, because they answer different questions.**
+
+- A **minimap** showing the whole garden at a glance, with plants by maturity,
+  blooms highlighted, and anything that changed since the last visit marked.
+- A **numbered index**, which is how the intended first user already organises
+  everything she keeps. A minimap is spatial; a numbered list answers "where is
+  #14" in a way no map can.
+
+The minimap, the numbered index, the garden overview and the exported wallpaper
+strip are **one renderer at four scales**.
 
 ### 9.2 Living-window mode
 
@@ -652,9 +694,9 @@ to real local time. This is the "watch them growing" experience.
 - PNG at exact device pixel dimensions for common iPad, iPhone and MacBook sizes.
 - Cropped to a single specimen (portrait) or the garden strip (landscape).
 - SVG export for arbitrary sizes.
-- No native app and no OS live wallpaper. iOS live wallpapers require a Live Photo
-  and Android live wallpapers require a native app. Both are out of scope, and
-  this is a stated limitation rather than an oversight.
+- No OS live wallpaper. iOS live wallpapers require a Live Photo and Android live
+  wallpapers require a native app. Both are out of scope, and this is a stated
+  limitation rather than an oversight.
 
 ### 9.4 Motion and accessibility
 
@@ -662,6 +704,33 @@ to real local time. This is the "watch them growing" experience.
 - Text scales with system settings.
 - The card, the genome view and the garden are keyboard-navigable.
 - Colour is never the sole carrier of meaning.
+
+### 9.5 Notifications
+
+Delivered as Web Push by the daily cron (§13), with the app badge carrying a quiet
+count of new things. iOS and iPadOS 16.4+ support both for Home Screen web apps,
+over APNs, with no Apple Developer Program membership.
+
+**The invariant: notifications report events, never absence.**
+
+| Allowed | Forbidden |
+|---|---|
+| A bloom has started | "Your garden misses you" |
+| A seed is ready to collect | "You have not visited in 3 days" |
+| A pollinator brought a seed | Streaks, milestones, "you're on a 5-day roll" |
+| Frost is coming, so a plant will go dormant | Anything generated because the user did nothing |
+
+Rules:
+
+- **At most one notification per day.** On a slow garden that means most days are
+  silent, which is the intended behaviour rather than a bug.
+- Each type is individually toggleable.
+- Permission is requested in response to a deliberate tap during onboarding, never
+  on load, which is both an iOS requirement and the polite pattern.
+- The badge shows the count of new events and clears when the app is opened.
+- Focus modes apply, so a user can silence the garden without resigning from it.
+- Because the cron runs daily, notifications are day-granular. A bloom is a
+  day-scale event so this is sufficient; sub-day timing is not promised.
 
 ---
 
@@ -681,6 +750,7 @@ create table gardens (
   owner_id    uuid not null references auth.users(id) on delete cascade,
   title       text,
   place_id    uuid references places(id),
+  beds        smallint not null default 1,    -- bounded, expandable extent
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
@@ -703,6 +773,7 @@ create table plantings (
   emphasis        smallint not null default 0,-- 0..3
   footnote        text,
   memory          text,
+  bed             smallint not null default 0,
   position        integer,
   deleted_at      timestamptz,                -- tombstone
   updated_at      timestamptz not null default now()
@@ -728,6 +799,20 @@ create table weather_days (
   shortwave_radiation real,
   weather_code        smallint,
   primary key (place_id, date)
+);
+
+-- Web Push endpoints. One row per user per device.
+create table push_subscriptions (
+  id          uuid primary key default gen_random_uuid(),
+  owner_id    uuid not null references auth.users(id) on delete cascade,
+  endpoint    text not null,
+  p256dh      text not null,
+  auth        text not null,
+  prefs       jsonb not null default
+                '{"bloom":true,"seed":true,"pollinator":true,"frost":true}',
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now(),
+  unique (owner_id, endpoint)
 );
 ```
 
@@ -774,6 +859,8 @@ row's owner can never be reassigned.
 - `gardens`: `owner_id = (select auth.uid())`
 - `plantings`: `garden_id in (select id from gardens where owner_id = (select auth.uid()))`
 - `blooms`: reachable through its planting, with the same ownership predicate
+- `push_subscriptions`: `owner_id = (select auth.uid())`, readable and writable by
+  the owner only. The cron reads it with the service role
 - `places`: readable by all authenticated users; writes only through the
   `get_or_create_place` RPC (SECURITY INVOKER)
 - `weather_days`: readable by all authenticated users; written only by the cron
@@ -830,7 +917,7 @@ recomputed, so growth cannot drift.
 
 ## 13. Operations
 
-One daily cron function on Vercel does three jobs:
+One daily cron function on Vercel does four jobs:
 
 1. **Keep-warm.** A few requests against Postgres to stay clear of the free-plan
    pause. Cadence beyond one run per day depends on Vercel's free-tier cron
@@ -840,6 +927,14 @@ One daily cron function on Vercel does three jobs:
    historical archive. Requests carry coordinates only, no identifiers.
 3. **Backups.** Dump every garden with its plantings and blooms to a dated JSON
    object in Supabase Storage, retaining roughly 30 days.
+4. **Notifications.** For each garden, compute which event notifications are due
+   using the same deterministic phenology the client uses, apply the user's
+   per-type preferences, and send them over Web Push. At most one per garden per
+   day. A day with no events produces no messages. The sender's decision function
+   must depend only on events and never on time-since-last-visit (§9.5).
+
+A stopped cron stops notifications as well as sync, which is the same free-plan
+caveat and is acceptable because nothing is lost.
 
 A garden is also exportable and importable as a single file from within the app,
 independent of the server. That is the user-facing guarantee that a garden
@@ -875,8 +970,9 @@ plants are plausible across a wide range of genomes and ages.
 | **M3** | Breeding: meiosis, crossover, mutation, selfing, the offspring predictor, genome view | Genetics proven by test; two devices converge |
 | **M4** | Supabase project, schema, RLS, email OTP with Turnstile, custom SMTP, sync | RLS proven by test |
 | **M5** | Solar lighting, weather, phenology wiring, the daily cron | Offline fallback verified while online; cron verified in production |
-| **M6** | Garden landscape scroll, living-window mode, wallpaper and SVG export | Exports at exact device sizes |
+| **M6** | Bounded expandable beds, garden landscape, minimap, numbered index, living-window mode, wallpaper and SVG export | Exports at exact device sizes; the minimap, index and wallpaper strip are one renderer |
 | **M7** | Pollinators, autonomous pollination, crossability and sterility, bud sports | Two devices compute identical visits |
+| **M8** | Web Push, notification preferences, the app badge, the cron notification job | No notification can be produced by absence, verified by test |
 | **Later** | Trees, polyploidy, self-incompatibility, carbon allocation, seasonal hemisphere detail | — |
 
 **The first account is the gift.** Her garden opens with a plant grown from a seed
@@ -894,6 +990,32 @@ Every user's first plant is grown from their own name, which gives a new garden
 something unambiguously personal without the product making any claim about
 anyone.
 
+### 15.2 Deferred phases
+
+Two features are deliberately deferred rather than dropped. Neither is committed
+and neither is in scope for v1.
+
+**Native widget.** The only feature that requires leaving the web platform. Apple
+exposes no web API for widgets; WidgetKit lives in a native target, which means an
+Apple Developer Program membership, code signing, and a distribution route that
+expires and must be re-uploaded. It is nonetheless an unusually good fit, because
+the simulation is deterministic and can hand WidgetKit a **pre-computed timeline of
+future entries**, sidestepping the refresh-budget limitation that makes most
+dynamic widgets disappointing. A widget could show a flower opening on Thursday and
+be correct with the app closed and no network. It warrants its own spec once the
+web app has earned the upkeep, and the iPad is the better target.
+
+**Generative audio.** Not committed, and the analysis is genuinely mixed. The good
+part is determinism: the same hash that draws the petals can compose the motif, so
+a plant sounds the same forever, and **a bred plant could inherit an audible blend
+of both parents**. The risk is that generic generative ambience is the closest
+thing in this design to the stock-AI aesthetic the intended first user would
+reject, and her relationship with music is album-shaped and specific rather than
+ambient. If it is built, it should be **sound design rather than a soundtrack**: a
+tone when a bud opens, a drone after dark, rain that is rain, silence otherwise.
+Off by default, never autoplay, paused when backgrounded, respecting the silent
+switch.
+
 ---
 
 ## 16. Testing
@@ -910,7 +1032,8 @@ anyone.
 | Phenology | Thermal time accumulation against known GDD values; prediction accuracy against a held-out weather series; and monotonicity **with respect to user actions** — no user action may push a bloom later, though weather legitimately can |
 | Solar math | Unit tests against known sunrise/sunset values across latitudes and dates |
 | Sync merge | Table-driven tests over §12, including tombstone-wins and last-write-wins |
-| RLS | Tests proving user A cannot select, update or delete user B's gardens, plantings or blooms, and cannot reassign ownership |
+| RLS | Tests proving user A cannot select, update or delete user B's gardens, plantings, blooms or push subscriptions, and cannot reassign ownership |
+| Notifications | A property test asserting no notification can be produced by absence: the sender's decision function is a pure function of events and must not accept time-since-last-visit as an input at all |
 | Export | An exported garden round-trips identically |
 | Accessibility | Reduced motion, keyboard navigation, text scaling, meaning not carried by colour alone |
 
@@ -919,11 +1042,11 @@ anyone.
 ## 17. Explicitly out of scope
 
 No AI of any kind. No streaks, guilt or decay. No ads, analytics or
-recommendation feeds. No notifications. No leaderboards. No public garden or
-social features. No caterpillars or larval stages. No live wallpapers or native
-apps. No in-jokes or references to the intended first user inside the product. No
-claims about what any user likes. No silent changes to something a user has grown
-attached to.
+recommendation feeds. **No absence-driven notifications of any kind** (§9.5). No
+leaderboards. No public garden or social features. No caterpillars or larval
+stages. No live wallpapers. No native app or widget in v1 (§15.2). No in-jokes or
+references to the intended first user inside the product. No claims about what any
+user likes. No silent changes to something a user has grown attached to.
 
 ---
 
@@ -931,8 +1054,8 @@ attached to.
 
 1. **Product name.** Working title "Ink Garden"; "Paper Garden" the alternative.
    The PWA manifest requires one before M2.
-2. **Trees.** Coconut, mango and avocado are landscape-scale and need the scroll
-   view first. Confirm after M6.
+2. **Trees.** Coconut, mango and avocado are landscape-scale and need the bed and
+   minimap views first. Confirm after M6.
 3. **Polyploidy.** Deferred, and genuinely powerful. Revisit after M7.
 4. **Self-incompatibility.** A real mechanism and a good later constraint.
 5. **Carbon allocation.** The allocation loci exist in v1. Confirm whether a
@@ -944,3 +1067,10 @@ attached to.
 9. **Genome cross-section view.** With the full genome visible from the start,
    confirm whether a chromosome-style visualisation or a simple labelled list is
    the better first presentation.
+10. **Native widget.** Deferred to its own phase (§15.2). Needs a decision on
+    whether to take on an Apple Developer Program membership and a build that must
+    be re-uploaded periodically.
+11. **Generative audio.** Deferred and uncommitted (§15.2). If it happens, sound
+    design rather than a soundtrack.
+12. **Bed size.** How large is one bed before a user should extend? Needs a real
+    answer at M6, and should be generous rather than stingy.
