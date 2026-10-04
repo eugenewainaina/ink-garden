@@ -1,10 +1,10 @@
 # Ink Garden — Design Specification
 
 **Date:** 2026-10-03
-**Revision:** 3 — supersedes revisions 1 and 2. Revision 2 redesigned the genome,
-growth, weather and acquisition models. Revision 3 changes the platform and
-notification model, and replaces the infinite scroll with bounded, expandable
-beds.
+**Revision:** 4 — supersedes revisions 1 to 3. Revision 2 redesigned the genome,
+growth, weather and acquisition models. Revision 3 changed the platform and
+notification model and replaced the infinite scroll. Revision 4 pins the
+toolchain, and corrects the inheritance coefficient.
 **Status:** Approved design, not yet implemented
 **Working name:** Ink Garden (provisional; see Open Questions)
 
@@ -104,7 +104,7 @@ Product invariants. Implementation may change freely; these may not.
 
 ```
 genotype    Record<LocusId, [Allele, Allele]>     stored, diploid, breedable
-    │ express(genome)                              dominance, epistasis, allometry
+    │ express(genome)                              blend, epistasis, allometry
 phenotype   a vector of trait values
     │ develop(phenotype, thermalTime, lifecycle)   meristem / phytomer simulation
 structure   geometry, at any age
@@ -176,20 +176,53 @@ product into a maintenance obligation.
 
 ### Stack
 
-| Concern | Choice |
-|---|---|
-| Language | TypeScript |
-| Monorepo | pnpm workspaces: `packages/engine`, `apps/web` |
-| UI | Vite + React |
-| Rendering | Canvas 2D, with an SVG export path |
-| PWA | `vite-plugin-pwa` (Workbox). Home Screen install, offline, no Apple Developer Program required |
-| Notifications | Web Push (VAPID) sent by the cron, plus the Badging API. Event-only, see §9.5 |
-| Local store | IndexedDB |
-| Database + auth | Supabase (Postgres, RLS, email OTP) |
-| Hosting | Vercel (static) + Vercel Cron |
-| Transactional email | Custom SMTP (Resend free tier) |
-| Bot protection | Cloudflare Turnstile via Supabase Auth CAPTCHA |
-| Weather | Open-Meteo forecast + archive APIs (no key) |
+Three runtimes exist in this project and they are not interchangeable.
+
+| Runtime | Whose choice | Role |
+|---|---|---|
+| **Safari / JavaScriptCore** on iOS and iPadOS | Not ours, fixed by the platform | The only runtime that affects a user. Everything else exists to serve it |
+| **Node on Vercel** | Constrained by the host | The daily cron |
+| **The development machine** | Ours | Developer experience, plus one correctness role below |
+
+**Bun is adopted as a second JavaScript engine, not as the platform.** Bun is
+powered by JavaScriptCore, Apple's engine for Safari, and several of its Web APIs
+are Safari's own implementations. Because derived state must agree across devices
+(§16), running the engine under both **Node (V8)** and **Bun (JSC)** is an
+intentional A/B of the exact pair that matters. The gallery renderer runs on Bun,
+so **the sheet the art is approved from is computed by the same engine family as
+the target device.** Bun ships nothing to users and could be removed entirely at
+the cost of that check.
+
+| Concern | Choice | Rejected alternative, and why |
+|---|---|---|
+| Language | **TypeScript** with `erasableSyntaxOnly` and `verbatimModuleSyntax` | Keep the same source runnable on Node, Bun, Vite and Deno with no build step, and ban `enum` in favour of `const` objects and union types |
+| Type checking | **`tsc --noEmit` as a hard CI gate** | Node and Bun both strip types *without checking them*. Nothing else verifies types, so this gate is not optional |
+| Monorepo | **pnpm workspaces**: `packages/engine`, `apps/web` | `bun install` is faster, but with a small dependency set speed is irrelevant and pnpm's strict non-flat `node_modules` prevents phantom dependencies, a real class of monorepo bug |
+| Dev runtime | **Node for CI and the cron; Bun for the engine loop and the gallery** | Deno is V8-based, so it buys no engine parity, and it is already implicit if a Supabase Edge Function is ever added |
+| App build | **Vite** | Bun's bundler has no equivalent of Workbox, and offline is a hard requirement |
+| UI | **React**, with Preact via `preact/compat` as the escape hatch | The UI is small and the canvas does the work. Bundle weight is paid once because the service worker caches it |
+| Rendering | **Canvas 2D**, with offscreen plant sprites cached by `(genomeId, tick)`, plus an **SVG export** path | WebGL or three.js would fight a flat ink look and complicate SVG export. If living-window mode later struggles with many plants, add a WebGL layer for that mode alone |
+| PWA | **vite-plugin-pwa** (Workbox) | Home Screen install, offline cache, service worker for push. No Apple Developer Program required |
+| Notifications | **Web Push (VAPID)** sent by the cron, plus the **Badging API**. Event-only, see §9.5 | — |
+| Push sending | **`web-push`** in the cron | Matches the cron's Node runtime |
+| Local store | **IndexedDB via `idb`** | Dexie would be more framework than is needed |
+| State | **No server-state library.** A small local store for UI state only | IndexedDB *is* the state and sync is hand-rolled (§12); a query library would duplicate what is already controlled |
+| Sync | **Hand-rolled last-write-wins** | **No CRDT.** The domain was designed so conflicts are benign, so Automerge or Yjs would be speculative complexity for a problem this design deliberately does not have |
+| Validation | **Zod** | Not optional. Importing a garden file is **untrusted input**, and genome migration needs validation or a malformed file corrupts a garden |
+| Solar | **`suncalc`** in the render layer; a **~10-line daylength function inside the engine** | Photoperiod affects phenology, so the engine needs daylength, but the engine stays dependency-free. Full solar position is presentation |
+| Styling | **CSS Modules**, no framework | Tailwind would fight a bespoke illustrated look |
+| Fonts | **Self-hosted subset serif** | An offline requirement and part of the look |
+| Lint and format | **Biome** | One fast tool instead of ESLint plus Prettier |
+| Database and auth | **Supabase** — Postgres, RLS, email OTP | — |
+| Hosting | **Vercel** static plus Vercel **Cron** | Bun as a Vercel function runtime is **unverified**, so the cron is Node |
+| Transactional email | **Custom SMTP** (Resend free tier) | Mandatory: Supabase's built-in mailer is capped at 2/hour project-wide |
+| Bot protection | **Cloudflare Turnstile** via Supabase Auth CAPTCHA | — |
+| Weather | **Open-Meteo** forecast and archive APIs, no key | Server-side only, so user coordinates never leave our server |
+| Unit tests | **Vitest** — one runner only | `bun test` would give two runners for one codebase. JSC coverage comes from a dedicated cross-engine diff test that shells out to Bun |
+| End-to-end tests | **Playwright WebKit** | WebKit is the engine family that matters, not Chromium |
+
+**Deliberately absent:** any AI or ML dependency, any analytics, any component or
+CSS framework beyond React, any CRDT, any WebGL, any native shell.
 
 ---
 
@@ -296,10 +329,26 @@ reshaping anyone's genome.
 
 ### 4.3 Inheritance
 
-**One dominance coefficient per locus**, which buys the full range for free:
-`0` recessive, `0.5` incomplete or codominant, `1` complete. Codominance matters,
-because two different anthocyanidins both expressing is how real hybrids get
-mixed colours.
+**One `blend` coefficient per locus**, which buys the full range of dominance
+behaviour for free:
+
+| `blend` | Meaning | A heterozygote expresses |
+|---|---|---|
+| `0` | Complete dominance | The higher-ranked allele alone |
+| between | Incomplete dominance | Both, the lower one partly masked |
+| `1` | Codominance | Both, equally |
+
+Allele order within a locus is the dominance series, so under complete dominance
+the higher index always wins. That is why the coefficient is called `blend` rather
+than `dominance`: with a ranked allele list the old wording was ambiguous, because
+a heterozygote at a "recessive" locus still shows the dominant allele, which made
+`dominance: 0` and `dominance: 1` behave identically.
+
+Codominance matters, because two different anthocyanidins both expressing is how
+real hybrids get mixed colours.
+
+**Meiosis is independent assortment per locus.** Loci do not co-segregate as
+though they shared a chromosome; chromosomal linkage is deferred (§18).
 
 **Quantitative traits are genuinely polygenic.** Three to five loci per trait,
 each allele worth 0 or 1, summed. This is barely more code than a single
@@ -1024,6 +1073,8 @@ switch.
 |---|---|
 | Engine determinism | Golden-file tests: fixed seed strings produce byte-identical output **within** an engine |
 | Cross-engine determinism | Tolerance-based comparison. `Math.sin` and friends are not required to be correctly rounded, and V8 and JavaScriptCore differ in the last bits. All geometry output is quantised to 1e-3 at the phenotype→structure boundary so this cannot change derived state |
+| Cross-runtime agreement | A test that runs the engine under **Node (V8)** and **Bun (JSC)** and diffs the outputs within the same tolerance. This is the pair that matters: V8 computes the CI golden files, JSC is what the user's device runs |
+| Browser engine | End-to-end tests run in **Playwright WebKit**, the same engine family as the target device, not Chromium |
 | Genetics: discrete | Punnett-square assertions per epistasis rule, including recessive masking and the doubling interaction |
 | Genetics: quantitative | Statistical tests over thousands of simulated crosses: expected means, expected variance, and the presence of transgressive segregation |
 | Genetics: mutation | Mutation rate matches configuration; the same `(childName, parents)` always yields the same mutations |
@@ -1036,6 +1087,17 @@ switch.
 | Notifications | A property test asserting no notification can be produced by absence: the sender's decision function is a pure function of events and must not accept time-since-last-visit as an input at all |
 | Export | An exported garden round-trips identically |
 | Accessibility | Reduced motion, keyboard navigation, text scaling, meaning not carried by colour alone |
+
+### The testing gap that cannot be closed in CI
+
+**Playwright WebKit is a WebKit build, not the Safari app.** It is a good proxy for
+the JavaScript engine and for layout, and a **bad** proxy for the behaviours most
+likely to break this product: Add to Home Screen, push permission and delivery,
+service worker eviction, and iOS storage limits.
+
+Those need a real iPad. Given that local storage is one of the two things standing
+between a user and losing a garden, **real-device testing is not a final step; it
+starts as soon as there is anything worth installing.**
 
 ---
 
@@ -1074,3 +1136,8 @@ user likes. No silent changes to something a user has grown attached to.
     design rather than a soundtrack.
 12. **Bed size.** How large is one bed before a user should extend? Needs a real
     answer at M6, and should be generous rather than stingy.
+13. **Chromosomal linkage.** Meiosis is independent assortment per locus (§4.3).
+    Real linkage would make nearby loci co-segregate, which is more realistic and
+    lets breeders use marker traits to predict unseen ones. Deferred because it
+    needs a chromosome model, and independent assortment already produces
+    plausible pedigrees.
