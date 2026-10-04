@@ -102,3 +102,172 @@ export function defaultDistribution(locus: Locus): readonly number[] {
 export function baselinePetalCount(template: SpeciesTemplate): number {
   return template.baseline.petalCount
 }
+
+/**
+ * The four founding species.
+ *
+ * Baselines use relative units: `stature` runs from 1 for a rosette to 20 for
+ * a large tree, and the others are relative to a small herb. `petalCount` is
+ * petals per flower, except for head inflorescences like dandelion where the
+ * visible "petals" are ligulate florets.
+ *
+ * Distributions declare only what makes each species distinctive; everything
+ * else takes the architecture-aware default.
+ *
+ * All four are perennials, which is botanically correct but means nothing yet
+ * exercises the annual or biennial lifecycle. A fast annual belongs in the
+ * founding set at M0c for that reason.
+ */
+
+export const ROSEMARY: SpeciesTemplate = {
+  id: 'rosemary',
+  commonName: 'Rosemary',
+  binomial: 'Salvia rosmarinus',
+  lineage: 'Salvia',
+  lifecycle: 'perennial',
+  daysToBloom: 240,
+  thermalBase: 6,
+  thermalConstant: 1400,
+  baseline: {
+    petalCount: 5,
+    stature: 3,
+    leafSize: 1.5,
+    flowerSize: 1,
+    stemThickness: 1.5,
+  },
+  distributions: {
+    'leaf.form': [0.95, 0.05, 0, 0, 0],
+    'leaf.margin': [1, 0, 0, 0],
+    'leaf.venation': [1, 0, 0],
+    'phyllotaxis.pattern': [0.9, 0.1, 0, 0],
+    'stem.pigment': [0.25, 0.75],
+    'thorn.presence': [0.05, 0.95],
+    'inflorescence.type': [0.08, 0.62, 0.25, 0.05, 0, 0, 0, 0],
+    'flower.symmetry': [0, 1],
+    'petal.shape': [0, 0, 0.3, 0.7, 0],
+    'pigment.anthocyanidin': [0.05, 0.1, 0.25, 0.6],
+    'pigment.carotenoid': [1, 0, 0, 0],
+    'photoperiod.response': [0.3, 0.4, 0.3],
+    'habit.height.a': [0.7, 0.3],
+    'leaf.length.a': [0.85, 0.15],
+    'leaf.width.a': [0.95, 0.05],
+    'lifecycle': [0, 0, 1],
+  },
+}
+
+export const DANDELION: SpeciesTemplate = {
+  id: 'dandelion',
+  commonName: 'Dandelion',
+  binomial: 'Taraxacum officinale',
+  lineage: 'Taraxacum',
+  lifecycle: 'perennial',
+  daysToBloom: 45,
+  thermalBase: 4,
+  thermalConstant: 420,
+  baseline: {
+    // A head of roughly fifty ligulate florets, not five petals.
+    petalCount: 50,
+    stature: 1.5,
+    leafSize: 4,
+    flowerSize: 2.5,
+    stemThickness: 0.4,
+  },
+  distributions: {
+    'leaf.form': [0.9, 0.1, 0, 0, 0],
+    'leaf.margin': [0, 0, 1, 0],
+    'leaf.venation': [1, 0, 0],
+    'phyllotaxis.pattern': [0.1, 0.05, 0.05, 0.8],
+    'thorn.presence': [1, 0],
+    'inflorescence.type': [0.04, 0, 0, 0, 0, 0, 0.96, 0],
+    'flower.symmetry': [1, 0],
+    'petal.shape': [0, 0, 0.2, 0.8, 0],
+    'petal.margin': [0, 0, 0.3, 0.7],
+    'pigment.anthocyanidin': [1, 0, 0, 0],
+    'pigment.carotenoid': [0.05, 0.85, 0.1, 0],
+    'photoperiod.response': [0.7, 0.2, 0.1],
+    'habit.height.a': [0.8, 0.2],
+    'thermal.constant.a': [0.85, 0.15],
+    'lifecycle': [0, 0, 1],
+  },
+}
+
+export const SPEARMINT: SpeciesTemplate = {
+  id: 'spearmint',
+  commonName: 'Spearmint',
+  binomial: 'Mentha spicata',
+  lineage: 'Mentha',
+  lifecycle: 'perennial',
+  daysToBloom: 90,
+  thermalBase: 5,
+  thermalConstant: 700,
+  baseline: {
+    petalCount: 5,
+    stature: 2,
+    leafSize: 2.5,
+    flowerSize: 0.5,
+    stemThickness: 0.4,
+  },
+  distributions: {
+    'leaf.form': [1, 0, 0, 0, 0],
+    'leaf.margin': [0, 1, 0, 0],
+    'leaf.venation': [1, 0, 0],
+    'phyllotaxis.pattern': [0, 0.95, 0.05, 0],
+    'stem.pigment': [1, 0],
+    'thorn.presence': [1, 0],
+    'inflorescence.type': [0.05, 0.35, 0.55, 0.05, 0, 0, 0, 0],
+    'flower.symmetry': [0, 1],
+    'petal.shape': [0, 0, 0.4, 0.6, 0],
+    'pigment.anthocyanidin': [0.1, 0.6, 0.25, 0.05],
+    'pigment.carotenoid': [1, 0, 0, 0],
+    'photoperiod.response': [0.2, 0.3, 0.5],
+    'habit.height.a': [0.55, 0.45],
+    'branch.apical_dominance.a': [0.8, 0.2],
+    'lifecycle': [0, 0, 1],
+  },
+}
+
+export const JACARANDA: SpeciesTemplate = {
+  id: 'jacaranda',
+  commonName: 'Jacaranda',
+  binomial: 'Jacaranda mimosifolia',
+  lineage: 'Jacaranda',
+  lifecycle: 'perennial',
+  daysToBloom: 2900,
+  thermalBase: 10,
+  thermalConstant: 18_000,
+  baseline: {
+    petalCount: 5,
+    stature: 20,
+    leafSize: 6,
+    flowerSize: 3,
+    stemThickness: 8,
+  },
+  distributions: {
+    'leaf.form': [0, 0.05, 0.95, 0, 0],
+    'leaf.margin': [1, 0, 0, 0],
+    'leaf.venation': [1, 0, 0],
+    'phyllotaxis.pattern': [0, 0.1, 0, 0.9],
+    'thorn.presence': [0.96, 0.04],
+    'inflorescence.type': [0.05, 0, 0.05, 0.9, 0, 0, 0, 0],
+    'flower.symmetry': [0, 1],
+    'flower.throat': [0.1, 0.85, 0.05],
+    'petal.shape': [0, 0, 0, 0.2, 0.8],
+    // The delphinidin branch, with copigment, is what makes jacaranda violet
+    // rather than magenta. True blue stays out of reach without the pH shift.
+    'pigment.anthocyanidin': [0.02, 0.03, 0.05, 0.9],
+    'pigment.carotenoid': [1, 0, 0, 0],
+    'pigment.copigment.a': [0.15, 0.85],
+    'photoperiod.response': [0.5, 0.4, 0.1],
+    'vernalization.required': [0.6, 0.4],
+    'habit.height.a': [0.05, 0.95],
+    'branch.count.a': [0.1, 0.9],
+    'lifecycle': [0, 0, 1],
+  },
+}
+
+export const SPECIES: readonly SpeciesTemplate[] = [
+  ROSEMARY,
+  DANDELION,
+  SPEARMINT,
+  JACARANDA,
+]

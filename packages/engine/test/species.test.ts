@@ -1,7 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import { founderGenome, genomeId } from '../src/genome.ts'
 import { LOCI, locusAt, locusIndex } from '../src/loci.ts'
-import { defaultDistribution, type SpeciesTemplate } from '../src/species.ts'
+import { expressPlant } from '../src/phenotype.ts'
+import {
+  DANDELION,
+  JACARANDA,
+  ROSEMARY,
+  SPECIES,
+  SPEARMINT,
+  defaultDistribution,
+  type SpeciesTemplate,
+} from '../src/species.ts'
+
+/** The plant, not just the genome: species assertions need the baseline. */
+function phenotypeFor(template: SpeciesTemplate, name: string) {
+  return expressPlant(founderGenome(template, name), template)
+}
 
 const fixture: SpeciesTemplate = {
   id: 'fixture',
@@ -150,5 +164,140 @@ describe('founderGenome', () => {
     }
     expect(sawOne).toBe(true)
     expect(sawZero).toBe(true)
+  })
+})
+
+describe('species baselines', () => {
+  it('gives every species a complete, positive baseline', () => {
+    for (const template of SPECIES) {
+      const b = template.baseline
+      for (const [field, value] of Object.entries(b)) {
+        expect(Number.isFinite(value)).toBe(true)
+        expect(value, `${template.id}.${field}`).toBeGreaterThan(0)
+      }
+    }
+  })
+
+  it('makes jacaranda a tree and rosemary a shrub from the same genome', () => {
+    const genome = founderGenome(JACARANDA, 'same')
+    const jac = expressPlant(genome, JACARANDA)
+    const rose = expressPlant(genome, ROSEMARY)
+    const jacHeight = jac.quantitative['height'] ?? 0
+    const roseHeight = rose.quantitative['height'] ?? 0
+    expect(jacHeight).toBeGreaterThan(roseHeight * 4)
+  })
+
+  it('pins petal number to each species baseline', () => {
+    const expected: ReadonlyArray<readonly [SpeciesTemplate, number]> = [
+      [ROSEMARY, 5],
+      [DANDELION, 50],
+      [SPEARMINT, 5],
+      [JACARANDA, 5],
+    ]
+    for (const [template, petals] of expected) {
+      // Across many plants, not one: a single sample can happen to be a
+      // double flower, and asserting on one would make this test a coin flip.
+      const counts = new Map<number, number>()
+      const n = 200
+      for (let i = 0; i < n; i += 1) {
+        const value =
+          phenotypeFor(template, `${template.id}-petal-${i}`).quantitative[
+            'petal.count'
+          ] ?? -1
+        counts.set(value, (counts.get(value) ?? 0) + 1)
+      }
+      const modal = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]
+      if (modal === undefined) throw new Error(`no samples for ${template.id}`)
+
+      // The species value is the norm.
+      expect(modal[0], template.id).toBeCloseTo(petals, 6)
+      // Doubling is a rare homeotic mutation, so the doubled value is the
+      // exception rather than the rule.
+      expect(modal[1] / n, template.id).toBeGreaterThan(0.8)
+    }
+  })
+
+  it('keeps saturation and lightness physical for every species', () => {
+    for (const template of SPECIES) {
+      for (let i = 0; i < 40; i += 1) {
+        const p = phenotypeFor(template, `${template.id}-${i}`)
+        const sat = p.quantitative['pigment.saturation'] ?? 0
+        const lit = p.quantitative['pigment.lightness'] ?? 0
+        const hue = p.quantitative['pigment.hue'] ?? 0
+        expect(sat).toBeGreaterThanOrEqual(0)
+        expect(sat).toBeLessThanOrEqual(1)
+        expect(lit).toBeGreaterThanOrEqual(0)
+        expect(lit).toBeLessThanOrEqual(1)
+        expect(hue).toBeGreaterThanOrEqual(0)
+        expect(hue).toBeLessThan(360)
+      }
+    }
+  })
+
+  it('makes rosemary read as a thorny, narrow-leaved, blue-flowered shrub', () => {
+    let thorned = 0
+    let needleLike = 0
+    let violetOrMagenta = 0
+    const n = 200
+    for (let i = 0; i < n; i += 1) {
+      const p = phenotypeFor(ROSEMARY, `rosemary-${i}`)
+      if (p.discrete['thorn.presence']?.winner === 1) thorned += 1
+      if (p.discrete['leaf.form']?.winner === 0) needleLike += 1
+      const branch = p.discrete['pigment.anthocyanidin']?.winner ?? 0
+      if (branch === 2 || branch === 3) violetOrMagenta += 1
+    }
+    expect(thorned / n).toBeGreaterThan(0.8)
+    expect(needleLike / n).toBeGreaterThan(0.8)
+    expect(violetOrMagenta / n).toBeGreaterThan(0.6)
+  })
+
+  it('makes dandelion a head-flowered rosette', () => {
+    let heads = 0
+    let yellow = 0
+    const n = 200
+    for (let i = 0; i < n; i += 1) {
+      const p = phenotypeFor(DANDELION, `dandelion-${i}`)
+      if (p.discrete['inflorescence.type']?.winner === 6) heads += 1
+      const car = p.discrete['pigment.carotenoid']?.winner ?? 0
+      const anth = p.discrete['pigment.anthocyanidin']?.winner ?? 0
+      if (anth === 0 && car >= 1) yellow += 1
+    }
+    expect(heads / n).toBeGreaterThan(0.9)
+    expect(yellow / n).toBeGreaterThan(0.7)
+  })
+
+  it('makes spearmint an opposite-leaved herb', () => {
+    let opposite = 0
+    let thornless = 0
+    const n = 200
+    for (let i = 0; i < n; i += 1) {
+      const p = phenotypeFor(SPEARMINT, `mint-${i}`)
+      if (p.discrete['phyllotaxis.pattern']?.winner === 1) opposite += 1
+      if (p.discrete['thorn.presence']?.winner === 0) thornless += 1
+    }
+    expect(opposite / n).toBeGreaterThan(0.85)
+    expect(thornless).toBe(n)
+  })
+
+  it('makes jacaranda a thornless bipinnate tree with panicles', () => {
+    let thornless = 0
+    let bipinnate = 0
+    let panicle = 0
+    const n = 200
+    for (let i = 0; i < n; i += 1) {
+      const p = phenotypeFor(JACARANDA, `jacaranda-${i}`)
+      if (p.discrete['thorn.presence']?.winner === 0) thornless += 1
+      if (p.discrete['leaf.form']?.winner === 2) bipinnate += 1
+      if (p.discrete['inflorescence.type']?.winner === 3) panicle += 1
+    }
+    expect(thornless / n).toBeGreaterThan(0.9)
+    expect(bipinnate / n).toBeGreaterThan(0.9)
+    expect(panicle / n).toBeGreaterThan(0.85)
+  })
+
+  it('gives the tree a far larger thermal budget than the herb', () => {
+    // A jacaranda takes years to flower from seed; a dandelion takes weeks.
+    expect(JACARANDA.thermalConstant).toBeGreaterThan(DANDELION.thermalConstant * 10)
+    expect(SPEARMINT.thermalConstant).toBeGreaterThan(DANDELION.thermalConstant)
   })
 })
