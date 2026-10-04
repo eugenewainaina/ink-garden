@@ -1,5 +1,5 @@
-import type { Allele } from './genome.ts'
-import type { DiscreteLocus } from './loci.ts'
+import type { Allele, Genome } from './genome.ts'
+import { LOCI, quantitativeTraits, type DiscreteLocus } from './loci.ts'
 
 export interface DiscreteTrait {
   /** Allele names being expressed, highest-ranked first. Two entries when blended. */
@@ -64,4 +64,45 @@ export function resolveDiscrete(
     blended: true,
     secondaryWeight,
   }
+}
+
+/**
+ * Traits that no locus contributes to directly; they are outputs of the
+ * epistasis rules in `epistasis.ts`. Declared here so a phenotype always has
+ * a complete, predictable shape.
+ */
+export const DERIVED_TRAITS: Readonly<Record<string, number>> = {
+  'pigment.hue': 0,
+  'pigment.saturation': 0,
+  'pigment.lightness': 0.92,
+  'flower.fertility': 1,
+}
+
+/**
+ * Genotype to phenotype. Discrete loci resolve through `resolveDiscrete`;
+ * quantitative loci sum their weight for every copy carrying allele 1.
+ */
+export function express(genome: Genome): Phenotype {
+  const mutable: MutablePhenotype = { discrete: {}, quantitative: {} }
+
+  for (const trait of quantitativeTraits()) mutable.quantitative[trait] = 0
+  for (const [trait, value] of Object.entries(DERIVED_TRAITS)) {
+    mutable.quantitative[trait] = value
+  }
+
+  LOCI.forEach((locus, index) => {
+    const pair = genome.alleles[index]
+    if (pair === undefined) {
+      throw new Error(`Genome is missing locus ${locus.id}; run migrateGenome first`)
+    }
+    if (locus.kind === 'discrete') {
+      mutable.discrete[locus.id] = resolveDiscrete(locus, pair)
+      return
+    }
+    const current = mutable.quantitative[locus.trait] ?? 0
+    mutable.quantitative[locus.trait] = current + locus.weight * (pair[0] + pair[1])
+  })
+
+  // Epistasis rules are applied here, added in Task 7.
+  return mutable
 }

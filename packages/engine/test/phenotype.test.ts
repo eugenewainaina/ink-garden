@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { resolveDiscrete } from '../src/phenotype.ts'
-import type { DiscreteLocus } from '../src/loci.ts'
+import { createGenome, type Genome } from '../src/genome.ts'
+import {
+  LOCI,
+  locusIndex,
+  quantitativeTraits,
+  type DiscreteLocus,
+} from '../src/loci.ts'
+import { DERIVED_TRAITS, express, resolveDiscrete } from '../src/phenotype.ts'
 
 const thorned: DiscreteLocus = {
   id: 'thorn.presence',
@@ -75,5 +81,65 @@ describe('resolveDiscrete', () => {
 
   it('rejects an allele outside the locus', () => {
     expect(() => resolveDiscrete(thorned, [0, 2])).toThrow(/invalid allele/i)
+  })
+})
+
+const flat = (): Genome => createGenome(LOCI.map(() => [0, 0] as const))
+
+function setAllele(genome: Genome, locusId: string, a: number, b: number): Genome {
+  const alleles = genome.alleles.map((pair, i) =>
+    i === locusIndex(locusId) ? ([a, b] as const) : pair,
+  )
+  return createGenome(alleles)
+}
+
+describe('express', () => {
+  it('covers every locus', () => {
+    const phenotype = express(flat())
+    for (const locus of LOCI) {
+      if (locus.kind === 'discrete') {
+        expect(phenotype.discrete[locus.id]).toBeDefined()
+      }
+    }
+  })
+
+  it('sums polygenic contributions per trait', () => {
+    const phenotype = express(flat())
+    expect(phenotype.quantitative['height']).toBe(0)
+
+    const tall = setAllele(flat(), 'habit.height.a', 1, 1)
+    expect(express(tall).quantitative['height']).toBeCloseTo(0.18, 10)
+  })
+
+  it('accumulates several loci onto one trait', () => {
+    let g = setAllele(flat(), 'petal.count.a', 1, 1)
+    g = setAllele(g, 'petal.count.b', 1, 1)
+    expect(express(g).quantitative['petal.count']).toBeCloseTo(2.3, 10)
+  })
+
+  it('includes every quantitative trait, present or not', () => {
+    const phenotype = express(flat())
+    for (const trait of quantitativeTraits()) {
+      expect(typeof phenotype.quantitative[trait]).toBe('number')
+    }
+  })
+
+  it('includes the derived traits that epistasis rules write to', () => {
+    const phenotype = express(flat())
+    for (const [trait, value] of Object.entries(DERIVED_TRAITS)) {
+      expect(phenotype.quantitative[trait]).toBeCloseTo(value, 10)
+    }
+  })
+
+  it('is deterministic', () => {
+    const g = setAllele(flat(), 'thorn.presence', 1, 0)
+    expect(express(g)).toEqual(express(g))
+  })
+
+  it('does not mutate the genome', () => {
+    const g = flat()
+    const before = JSON.stringify(g)
+    express(g)
+    expect(JSON.stringify(g)).toBe(before)
   })
 })
