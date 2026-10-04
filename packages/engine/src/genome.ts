@@ -1,5 +1,6 @@
 import { LOCI, locusAt, locusIndex, type Locus } from './loci.ts'
 import { hash32, pickWeighted, rngFrom } from './rng.ts'
+import { defaultDistribution, type SpeciesTemplate } from './species.ts'
 
 export const GENOME_VERSION = 1
 
@@ -102,5 +103,34 @@ export function migrateGenome(genome: Genome): Genome {
     alleles.push([a, b] as const)
   }
 
+  return { version: GENOME_VERSION, alleles }
+}
+
+/**
+ * Express a founding plant: each allele copy is drawn from the species
+ * distribution for its locus, using randomness seeded by the plant's name.
+ * Bounded variance comes from the distribution's shape, so a species with a
+ * narrow distribution produces near-identical founders.
+ */
+export function founderGenome(
+  template: SpeciesTemplate,
+  seed: string,
+): Genome {
+  const alleles: (readonly [Allele, Allele])[] = []
+  for (const locus of LOCI) {
+    const declared = template.distributions[locus.id]
+    const distribution = declared ?? defaultDistribution(locus)
+    const count = alleleCount(locus)
+    if (distribution.length !== count) {
+      throw new Error(
+        `Species ${template.id}: distribution for ${locus.id} has ` +
+          `${distribution.length} entries, expected ${count}`,
+      )
+    }
+    const r = rngFrom(`${seed}|${template.id}|${locus.id}`)
+    const a = pickWeighted(distribution, r())
+    const b = pickWeighted(distribution, r())
+    alleles.push([a, b] as const)
+  }
   return { version: GENOME_VERSION, alleles }
 }
