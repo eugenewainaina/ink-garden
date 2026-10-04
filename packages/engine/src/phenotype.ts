@@ -1,3 +1,4 @@
+import { applyEpistasis } from './epistasis.ts'
 import type { Allele, Genome } from './genome.ts'
 import { LOCI, quantitativeTraits, type DiscreteLocus } from './loci.ts'
 
@@ -103,6 +104,9 @@ export function express(genome: Genome): Phenotype {
     mutable.quantitative[locus.trait] = current + locus.weight * (pair[0] + pair[1])
   })
 
-  // Epistasis rules are applied here, added in Task 7.
+  // Epistasis runs last, on the assembled phenotype. The rule table lives in
+  // epistasis.ts, which imports only types from this module, so the apparent
+  // cycle is erased at runtime by verbatimModuleSyntax.
+  applyEpistasis(mutable)
   return mutable
 }
