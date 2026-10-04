@@ -1,0 +1,178 @@
+export type LocusKind = 'discrete' | 'quantitative'
+
+/**
+ * A discrete locus. Allele order is the dominance series: under complete
+ * dominance (blend 0) the higher index always wins.
+ */
+export interface DiscreteLocus {
+  readonly id: string
+  readonly kind: 'discrete'
+  readonly alleles: readonly string[]
+  /** 0 = complete dominance, 1 = codominance, between = incomplete. */
+  readonly blend: number
+  /** Probability per copy of mutating on a cross. */
+  readonly mutation: number
+}
+
+/** A quantitative locus contributing `weight` per copy carrying allele 1. */
+export interface QuantitativeLocus {
+  readonly id: string
+  readonly kind: 'quantitative'
+  readonly trait: string
+  readonly weight: number
+  readonly mutation: number
+}
+
+export type Locus = DiscreteLocus | QuantitativeLocus
+
+const d = (
+  id: string,
+  alleles: readonly string[],
+  blend: number,
+  mutation = 0.004,
+): DiscreteLocus => ({ id, kind: 'discrete', alleles, blend, mutation })
+
+const q = (
+  id: string,
+  trait: string,
+  weight: number,
+  mutation = 0.004,
+): QuantitativeLocus => ({ id, kind: 'quantitative', trait, weight, mutation })
+
+/**
+ * The catalogue, in locus order. A genome's allele array is parallel to this.
+ * Adding a locus is a one-line change, and migrateGenome fills it for
+ * existing plants deterministically.
+ *
+ * This is a first pass and is expected to grow as the four founding species
+ * are tuned at M0c. Counts: 25 discrete, 53 quantitative.
+ */
+export const LOCI: readonly Locus[] = [
+  // Master identity
+  d('flower.organ.identity', ['normal', 'sepals.petaloid'], 1),
+  d('flower.doubling', ['single', 'double'], 1),
+  d('flower.symmetry', ['actinomorphic', 'zygomorphic'], 1),
+  d('inflorescence.type', ['solitary', 'spike', 'raceme', 'panicle', 'umbel', 'corymb', 'head', 'cyme'], 1),
+  d('leaf.form', ['simple', 'pinnate', 'bipinnate', 'palmate', 'cordate'], 1),
+
+  // Habit and stem
+  d('habit.determinacy', ['determinate', 'indeterminate'], 0.5),
+  d('phyllotaxis.pattern', ['alternate', 'decussate', 'whorled', 'spiral'], 1),
+  d('stem.pigment', ['green', 'red.brown'], 0.5),
+  d('stem.pubescence', ['glabrous', 'pubescent'], 1),
+  q('habit.height.a', 'height', 0.09),
+  q('habit.height.b', 'height', 0.06),
+  q('internode.length.a', 'internode.length', 0.11),
+  q('internode.length.b', 'internode.length', 0.07),
+  q('stem.thickness.a', 'stem.thickness', 0.04),
+  q('stem.thickness.b', 'stem.thickness', 0.02),
+  q('branch.angle.a', 'branch.angle', 0.08),
+  q('branch.angle.b', 'branch.angle', 0.05),
+  q('branch.count.a', 'branch.count', 0.6),
+  q('branch.count.b', 'branch.count', 0.35),
+  q('branch.apical_dominance.a', 'branch.apical_dominance', 0.09),
+  q('branch.apical_dominance.b', 'branch.apical_dominance', 0.06),
+
+  // Leaf
+  d('leaf.margin', ['entire', 'serrate', 'dentate', 'lobed'], 1),
+  d('leaf.venation', ['pinnate', 'palmate', 'parallel'], 1),
+  d('leaf.variegation', ['none', 'marginal', 'splashed', 'striped'], 0),
+  d('leaf.pubescence', ['glabrous', 'pubescent'], 1),
+  q('leaf.length.a', 'leaf.length', 0.5),
+  q('leaf.length.b', 'leaf.length', 0.28),
+  q('leaf.width.a', 'leaf.width', 0.22),
+  q('leaf.width.b', 'leaf.width', 0.13),
+  q('leaf.petiole', 'leaf.petiole', 0.18),
+  q('leaf.gloss', 'leaf.gloss', 0.06),
+
+  // Armature
+  d('thorn.presence', ['thornless', 'thorned'], 1),
+  q('thorn.density.a', 'thorn.density', 0.5),
+  q('thorn.density.b', 'thorn.density', 0.32),
+  q('thorn.curvature', 'thorn.curvature', 0.07),
+  q('thorn.length', 'thorn.length', 0.16),
+
+  // Flower
+  d('petal.shape', ['rounded', 'obovate', 'spatulate', 'ligulate', 'clawed'], 1),
+  d('petal.margin', ['entire', 'ruffled', 'fringed', 'notched'], 0.5),
+  d('flower.throat', ['open', 'tubular', 'spurred'], 1),
+  d('nectar_guide', ['absent', 'present'], 1),
+  q('flower.diameter.a', 'flower.diameter', 0.55),
+  q('flower.diameter.b', 'flower.diameter', 0.34),
+  q('petal.count.a', 'petal.count', 0.7),
+  q('petal.count.b', 'petal.count', 0.45),
+  q('petal.length.a', 'petal.length', 0.3),
+  q('petal.length.b', 'petal.length', 0.19),
+  q('petal.width', 'petal.width', 0.15),
+  q('petal.curl', 'petal.curl', 0.08),
+  q('petal.overlap', 'petal.overlap', 0.1),
+  q('petal.substance', 'petal.substance', 0.1),
+
+  // Pigment
+  d('pigment.anthocyanidin', ['none', 'pelargonidin', 'cyanidin', 'delphinidin'], 1),
+  d('pigment.carotenoid', ['none', 'yellow', 'orange', 'red'], 1),
+  d('pigment.petal.chlorophyll', ['none', 'green'], 1),
+  d('pigment.pattern', ['solid', 'gradient', 'picotee', 'blotch', 'speckled'], 0.5),
+  q('pigment.intensity.a', 'pigment.intensity', 0.4),
+  q('pigment.intensity.b', 'pigment.intensity', 0.25),
+  q('pigment.intensity.c', 'pigment.intensity', 0.15),
+  q('pigment.copigment.a', 'pigment.copigment', 0.4),
+  q('pigment.copigment.b', 'pigment.copigment', 0.22),
+  q('pigment.vacuolar.ph.a', 'pigment.vacuolar.ph', 0.4),
+  q('pigment.vacuolar.ph.b', 'pigment.vacuolar.ph', 0.24),
+  q('pigment.cold.response', 'pigment.cold.response', 0.3),
+  q('pigment.gradient_extent', 'pigment.gradient_extent', 0.3),
+  q('pigment.tip_shift', 'pigment.tip_shift', 0.2),
+
+  // Phenology
+  d('photoperiod.response', ['day.neutral', 'short.day', 'long.day'], 1),
+  d('vernalization.required', ['none', 'required'], 1),
+  q('thermal.base_temp.a', 'thermal.base_temp', 2.5),
+  q('thermal.base_temp.b', 'thermal.base_temp', 1.5),
+  q('thermal.constant.a', 'thermal.constant', 90),
+  q('thermal.constant.b', 'thermal.constant', 55),
+  q('thermal.constant.c', 'thermal.constant', 30),
+  q('photoperiod.critical', 'photoperiod.critical', 0.6),
+  q('vernalization.hours', 'vernalization.hours', 80),
+  q('dormancy.depth', 'dormancy.depth', 0.35),
+  q('senescence.rate', 'senescence.rate', 0.25),
+
+  // Lifecycle and allocation
+  d('lifecycle', ['annual', 'biennial', 'perennial'], 0),
+  q('allocation.root_shoot', 'allocation.root_shoot', 0.15),
+  q('allocation.leaf_vs_stem', 'allocation.leaf_vs_stem', 0.15),
+]
+
+export const LOCUS_INDEX: ReadonlyMap<string, number> = new Map(
+  LOCI.map((locus, index) => [locus.id, index]),
+)
+
+export function locusAt(index: number): Locus {
+  const locus = LOCI[index]
+  if (locus === undefined) throw new Error(`No locus at index ${index}`)
+  return locus
+}
+
+export function locusIndex(id: string): number {
+  const index = LOCUS_INDEX.get(id)
+  if (index === undefined) throw new Error(`Unknown locus: ${id}`)
+  return index
+}
+
+export function locusById(id: string): Locus {
+  return locusAt(locusIndex(id))
+}
+
+let cachedTraits: readonly string[] | undefined
+
+/** The sorted, de-duplicated list of quantitative trait names. */
+export function quantitativeTraits(): readonly string[] {
+  if (cachedTraits === undefined) {
+    const found = new Set<string>()
+    for (const locus of LOCI) {
+      if (locus.kind === 'quantitative') found.add(locus.trait)
+    }
+    cachedTraits = [...found].sort()
+  }
+  return cachedTraits
+}
