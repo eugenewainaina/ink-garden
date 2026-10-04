@@ -1,6 +1,25 @@
 export type LocusKind = 'discrete' | 'quantitative'
 
 /**
+ * How a trait is inherited in reality, which determines how much variation is
+ * expressed and how common a non-reference allele is.
+ *
+ * - `canalised`   Developmental robustness. Real floral development is
+ *                 "remarkably robust in terms of the identity and number of
+ *                 floral organs in each whorl", and that robustness actively
+ *                 suppresses hidden variation (Monniaux et al. 2016, Ann Bot).
+ *                 So the reference allele is near-fixed and a species must
+ *                 declare anything it does differently.
+ * - `polymorphic` Genuinely variable within a species. Moderate frequencies.
+ * - `homeotic`    A rare regulatory mutation that changes organ identity.
+ *                 Almost always the reference allele; the mutant is uncommon.
+ *                 This is where ornamental novelty comes from. Double flowers
+ *                 and green petals are both homeotic (Li et al. 2026, Hortic
+ *                 Res; Katsumoto et al. 2007 for the delphinidin case).
+ */
+export type Architecture = 'canalised' | 'polymorphic' | 'homeotic'
+
+/**
  * A discrete locus. Allele order is the dominance series: under complete
  * dominance (blend 0) the higher index always wins.
  */
@@ -12,9 +31,22 @@ export interface DiscreteLocus {
   readonly blend: number
   /** Probability per copy of mutating on a cross. */
   readonly mutation: number
+  readonly architecture: Architecture
+  /**
+   * Which allele is the normal, wild-type state. Defaults to 0. This is not
+   * always index 0, because allele order is the dominance series and the
+   * dominant allele can be the derived one: `flower.canalisation` is listed
+   * decanalised first so that canalised dominates, but canalised is the
+   * normal state and therefore the reference.
+   */
+  readonly referenceAllele?: number
 }
 
-/** A quantitative locus contributing `weight` per copy carrying allele 1. */
+/**
+ * A quantitative locus contributing `weight` per copy carrying allele 1.
+ * These are the traits that really are polygenic: "many genes of small
+ * effect" (Pieper et al. 2016, New Phytol).
+ */
 export interface QuantitativeLocus {
   readonly id: string
   readonly kind: 'quantitative'
@@ -29,8 +61,18 @@ const d = (
   id: string,
   alleles: readonly string[],
   blend: number,
+  architecture: Architecture,
   mutation = 0.004,
-): DiscreteLocus => ({ id, kind: 'discrete', alleles, blend, mutation })
+  referenceAllele = 0,
+): DiscreteLocus => ({
+  id,
+  kind: 'discrete',
+  alleles,
+  blend,
+  mutation,
+  architecture,
+  referenceAllele,
+})
 
 const q = (
   id: string,
@@ -44,22 +86,27 @@ const q = (
  * Adding a locus is a one-line change, and migrateGenome fills it for
  * existing plants deterministically.
  *
- * This is a first pass and is expected to grow as the four founding species
- * are tuned at M0c. Counts: 25 discrete, 53 quantitative.
+ * Counts: 26 discrete, 53 quantitative. First pass; tuned at M0c.
  */
 export const LOCI: readonly Locus[] = [
-  // Master identity
-  d('flower.organ.identity', ['normal', 'sepals.petaloid'], 1),
-  d('flower.doubling', ['single', 'double'], 1),
-  d('flower.symmetry', ['actinomorphic', 'zygomorphic'], 1),
-  d('inflorescence.type', ['solitary', 'spike', 'raceme', 'panicle', 'umbel', 'corymb', 'head', 'cyme'], 1),
-  d('leaf.form', ['simple', 'pinnate', 'bipinnate', 'palmate', 'cordate'], 1),
+  // Master identity. Canalised: organ identity and count are robust, and
+  // variation only appears when that robustness is lost.
+  d('flower.organ.identity', ['normal', 'sepals.petaloid'], 1, 'homeotic', 0.002),
+  d('flower.doubling', ['single', 'double'], 1, 'homeotic', 0.006),
+  d('flower.symmetry', ['actinomorphic', 'zygomorphic'], 1, 'canalised'),
+  d('inflorescence.type', ['solitary', 'spike', 'raceme', 'panicle', 'umbel', 'corymb', 'head', 'cyme'], 1, 'canalised'),
+  d('leaf.form', ['simple', 'pinnate', 'bipinnate', 'palmate', 'cordate'], 1, 'canalised'),
+
+  // The canalisation switch itself. Reference is `canalised`, which is
+  // dominant, so losing robustness needs two copies. When it is lost, the
+  // petal-variance loci below stop being silent.
+  d('flower.canalisation', ['decanalised', 'canalised'], 0, 'homeotic', 0.002, 1),
 
   // Habit and stem
-  d('habit.determinacy', ['determinate', 'indeterminate'], 0.5),
-  d('phyllotaxis.pattern', ['alternate', 'decussate', 'whorled', 'spiral'], 1),
-  d('stem.pigment', ['green', 'red.brown'], 0.5),
-  d('stem.pubescence', ['glabrous', 'pubescent'], 1),
+  d('habit.determinacy', ['determinate', 'indeterminate'], 0.5, 'canalised'),
+  d('phyllotaxis.pattern', ['alternate', 'decussate', 'whorled', 'spiral'], 1, 'canalised'),
+  d('stem.pigment', ['green', 'red.brown'], 0.5, 'polymorphic'),
+  d('stem.pubescence', ['glabrous', 'pubescent'], 1, 'polymorphic'),
   q('habit.height.a', 'height', 0.09),
   q('habit.height.b', 'height', 0.06),
   q('internode.length.a', 'internode.length', 0.11),
@@ -74,10 +121,10 @@ export const LOCI: readonly Locus[] = [
   q('branch.apical_dominance.b', 'branch.apical_dominance', 0.06),
 
   // Leaf
-  d('leaf.margin', ['entire', 'serrate', 'dentate', 'lobed'], 1),
-  d('leaf.venation', ['pinnate', 'palmate', 'parallel'], 1),
-  d('leaf.variegation', ['none', 'marginal', 'splashed', 'striped'], 0),
-  d('leaf.pubescence', ['glabrous', 'pubescent'], 1),
+  d('leaf.margin', ['entire', 'serrate', 'dentate', 'lobed'], 1, 'canalised'),
+  d('leaf.venation', ['pinnate', 'palmate', 'parallel'], 1, 'canalised'),
+  d('leaf.variegation', ['none', 'marginal', 'splashed', 'striped'], 0, 'homeotic', 0.004),
+  d('leaf.pubescence', ['glabrous', 'pubescent'], 1, 'polymorphic'),
   q('leaf.length.a', 'leaf.length', 0.5),
   q('leaf.length.b', 'leaf.length', 0.28),
   q('leaf.width.a', 'leaf.width', 0.22),
@@ -86,21 +133,23 @@ export const LOCI: readonly Locus[] = [
   q('leaf.gloss', 'leaf.gloss', 0.06),
 
   // Armature
-  d('thorn.presence', ['thornless', 'thorned'], 1),
+  d('thorn.presence', ['thornless', 'thorned'], 1, 'polymorphic'),
   q('thorn.density.a', 'thorn.density', 0.5),
   q('thorn.density.b', 'thorn.density', 0.32),
   q('thorn.curvature', 'thorn.curvature', 0.07),
   q('thorn.length', 'thorn.length', 0.16),
 
   // Flower
-  d('petal.shape', ['rounded', 'obovate', 'spatulate', 'ligulate', 'clawed'], 1),
-  d('petal.margin', ['entire', 'ruffled', 'fringed', 'notched'], 0.5),
-  d('flower.throat', ['open', 'tubular', 'spurred'], 1),
-  d('nectar_guide', ['absent', 'present'], 1),
+  d('petal.shape', ['rounded', 'obovate', 'spatulate', 'ligulate', 'clawed'], 1, 'canalised'),
+  d('petal.margin', ['entire', 'ruffled', 'fringed', 'notched'], 0.5, 'canalised'),
+  d('flower.throat', ['open', 'tubular', 'spurred'], 1, 'canalised'),
+  d('nectar_guide', ['absent', 'present'], 1, 'polymorphic'),
   q('flower.diameter.a', 'flower.diameter', 0.55),
   q('flower.diameter.b', 'flower.diameter', 0.34),
-  q('petal.count.a', 'petal.count', 0.7),
-  q('petal.count.b', 'petal.count', 0.45),
+  // Cryptic variation for petal number. Silent unless `flower.canalisation`
+  // is lost. This is the "cryptic genetic variation" of Monniaux et al.
+  q('petal.variance.a', 'petal.variance', 0.5),
+  q('petal.variance.b', 'petal.variance', 0.3),
   q('petal.length.a', 'petal.length', 0.3),
   q('petal.length.b', 'petal.length', 0.19),
   q('petal.width', 'petal.width', 0.15),
@@ -108,11 +157,12 @@ export const LOCI: readonly Locus[] = [
   q('petal.overlap', 'petal.overlap', 0.1),
   q('petal.substance', 'petal.substance', 0.1),
 
-  // Pigment
-  d('pigment.anthocyanidin', ['none', 'pelargonidin', 'cyanidin', 'delphinidin'], 1),
-  d('pigment.carotenoid', ['none', 'yellow', 'orange', 'red'], 1),
-  d('pigment.petal.chlorophyll', ['none', 'green'], 1),
-  d('pigment.pattern', ['solid', 'gradient', 'picotee', 'blotch', 'speckled'], 0.5),
+  // Pigment. Species-characteristic, so canalised: a species is usually one
+  // colour, and white is a perfectly plausible default.
+  d('pigment.anthocyanidin', ['none', 'pelargonidin', 'cyanidin', 'delphinidin'], 1, 'polymorphic'),
+  d('pigment.carotenoid', ['none', 'yellow', 'orange', 'red'], 1, 'polymorphic'),
+  d('pigment.petal.chlorophyll', ['none', 'green'], 1, 'homeotic', 0.003),
+  d('pigment.pattern', ['solid', 'gradient', 'picotee', 'blotch', 'speckled'], 0.5, 'polymorphic'),
   q('pigment.intensity.a', 'pigment.intensity', 0.4),
   q('pigment.intensity.b', 'pigment.intensity', 0.25),
   q('pigment.intensity.c', 'pigment.intensity', 0.15),
@@ -125,8 +175,8 @@ export const LOCI: readonly Locus[] = [
   q('pigment.tip_shift', 'pigment.tip_shift', 0.2),
 
   // Phenology
-  d('photoperiod.response', ['day.neutral', 'short.day', 'long.day'], 1),
-  d('vernalization.required', ['none', 'required'], 1),
+  d('photoperiod.response', ['day.neutral', 'short.day', 'long.day'], 1, 'polymorphic'),
+  d('vernalization.required', ['none', 'required'], 1, 'polymorphic'),
   q('thermal.base_temp.a', 'thermal.base_temp', 2.5),
   q('thermal.base_temp.b', 'thermal.base_temp', 1.5),
   q('thermal.constant.a', 'thermal.constant', 90),
@@ -138,7 +188,7 @@ export const LOCI: readonly Locus[] = [
   q('senescence.rate', 'senescence.rate', 0.25),
 
   // Lifecycle and allocation
-  d('lifecycle', ['annual', 'biennial', 'perennial'], 0),
+  d('lifecycle', ['annual', 'biennial', 'perennial'], 0, 'canalised'),
   q('allocation.root_shoot', 'allocation.root_shoot', 0.15),
   q('allocation.leaf_vs_stem', 'allocation.leaf_vs_stem', 0.15),
 ]
@@ -175,4 +225,25 @@ export function quantitativeTraits(): readonly string[] {
     cachedTraits = [...found].sort()
   }
   return cachedTraits
+}
+
+let cachedMaxima: ReadonlyMap<string, number> | undefined
+
+/**
+ * The largest value a quantitative trait can reach, being the sum of the
+ * weights of every locus contributing to it. Used to normalise a genomic
+ * value into 0..1 before a species scale is applied.
+ */
+export function traitMaximum(trait: string): number {
+  if (cachedMaxima === undefined) {
+    const maxima = new Map<string, number>()
+    for (const locus of LOCI) {
+      if (locus.kind !== 'quantitative') continue
+      maxima.set(locus.trait, (maxima.get(locus.trait) ?? 0) + locus.weight * 2)
+    }
+    cachedMaxima = maxima
+  }
+  const max = cachedMaxima.get(trait)
+  if (max === undefined) throw new Error(`Unknown quantitative trait: ${trait}`)
+  return max
 }

@@ -149,11 +149,13 @@ export const EPISTASIS: readonly EpistasisRule[] = [
     },
   },
   {
-    id: 'flower.doubling.expands',
+    id: 'flower.doubling.fertility',
     when: (p) => winner(p, 'flower.doubling') === 'double',
     apply: (p) => {
-      // Homeotic conversion of stamens into petals: more petals, less seed.
-      p.quantitative['petal.count'] = trait(p, 'petal.count') * 1.9
+      // The homeotic conversion of stamens into petals costs seed set. The
+      // petal-count multiplication that belongs to the same mutation is
+      // applied by `expressPlant`, which is the layer that knows the species
+      // petal count, so the factor lives in exactly one place.
       p.quantitative['flower.fertility'] = 0.4
     },
   },

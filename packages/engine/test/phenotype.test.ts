@@ -14,6 +14,7 @@ const thorned: DiscreteLocus = {
   alleles: ['thornless', 'thorned'],
   blend: 0,
   mutation: 0.004,
+  architecture: 'polymorphic',
 }
 
 const series: DiscreteLocus = {
@@ -22,6 +23,7 @@ const series: DiscreteLocus = {
   alleles: ['none', 'pelargonidin', 'cyanidin', 'delphinidin'],
   blend: 0,
   mutation: 0.004,
+  architecture: 'canalised',
 }
 
 const codominant: DiscreteLocus = { ...series, blend: 1 }
@@ -112,9 +114,15 @@ describe('express', () => {
   })
 
   it('accumulates several loci onto one trait', () => {
-    let g = setAllele(flat(), 'petal.count.a', 1, 1)
-    g = setAllele(g, 'petal.count.b', 1, 1)
-    expect(express(g).quantitative['petal.count']).toBeCloseTo(2.3, 10)
+    let g = setAllele(flat(), 'leaf.length.a', 1, 1)
+    g = setAllele(g, 'leaf.length.b', 1, 1)
+    expect(express(g).quantitative['leaf.length']).toBeCloseTo(1.56, 10)
+  })
+
+  it('does not invent a petal count without a species', () => {
+    // Petal number is canalised, so it is a species-level trait. The genomic
+    // layer must not guess one.
+    expect(express(flat()).quantitative['petal.count']).toBeUndefined()
   })
 
   it('includes every quantitative trait, present or not', () => {

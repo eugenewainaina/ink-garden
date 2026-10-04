@@ -148,17 +148,15 @@ describe('the colour pathway', () => {
 })
 
 describe('the doubling tradeoff', () => {
-  it('multiplies petal count and reduces fertility', () => {
+  it('reduces fertility for a double flower', () => {
     const p = withWinner(base(), 'flower.doubling', 'double', 1)
     const doubled = applyEpistasis(p)
-    expect(doubled.quantitative['petal.count']).toBeCloseTo(9.5, 10)
     expect(doubled.quantitative['flower.fertility']).toBeLessThan(1)
     expect(doubled.quantitative['flower.fertility']).toBeGreaterThan(0)
   })
 
   it("leaves a single flower's fertility alone", () => {
     const p = applyEpistasis(base())
-    expect(p.quantitative['petal.count']).toBeCloseTo(5, 10)
     expect(p.quantitative['flower.fertility']).toBe(1)
   })
 })

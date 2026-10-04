@@ -62,6 +62,7 @@ describe('the locus catalogue', () => {
       'pigment.petal.chlorophyll',
       'photoperiod.response',
       'lifecycle',
+      'flower.canalisation',
     ]) {
       expect(ids).toContain(required)
     }
@@ -70,8 +71,18 @@ describe('the locus catalogue', () => {
   it('lists each quantitative trait once', () => {
     const traits = quantitativeTraits()
     expect(new Set(traits).size).toBe(traits.length)
-    expect(traits).toContain('petal.count')
+    expect(traits).toContain('petal.variance')
     expect(traits).toContain('height')
+    // petal.count is canalised, not polygenic, so it must not be a
+    // locus-contributed trait at all.
+    expect(traits).not.toContain('petal.count')
+  })
+
+  it('declares an architecture for every discrete locus', () => {
+    for (const locus of LOCI) {
+      if (locus.kind !== 'discrete') continue
+      expect(['canalised', 'polymorphic', 'homeotic']).toContain(locus.architecture)
+    }
   })
 
   it('throws on an unknown locus', () => {
