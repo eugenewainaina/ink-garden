@@ -12,10 +12,12 @@ dist/
 .env.*
 *.local
 
-# Private design research about real people.
-# The spec must never contain quotes or profiles from these sources (see spec §14).
-evidence/
-research/
+# Private research about real people, kept at the repository root.
+# The spec must never contain quotes or profiles from these sources (spec §14).
+# Anchored to the root on purpose: docs/research/ holds PUBLIC research notes
+# that are meant to be committed, and an unanchored `research/` swallowed them.
+/evidence/
+/research/
 *.chat.txt
 *.profile.md
 
