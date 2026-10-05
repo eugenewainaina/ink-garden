@@ -1,10 +1,13 @@
 # Ink Garden — Design Specification
 
 **Date:** 2026-10-03
-**Revision:** 4 — supersedes revisions 1 to 3. Revision 2 redesigned the genome,
+**Revision:** 5 — supersedes revisions 1 to 4. Revision 2 redesigned the genome,
 growth, weather and acquisition models. Revision 3 changed the platform and
-notification model and replaced the infinite scroll. Revision 4 pins the
-toolchain, and corrects the inheritance coefficient.
+notification model and replaced the infinite scroll. Revision 4 pinned the
+toolchain and corrected the inheritance coefficient. Revision 5 records what
+building M0a taught us about plant biology, which changed the genome's shape:
+trait architecture, canalisation and cryptic variation, the reference allele,
+and species baselines.
 **Status:** Approved design, not yet implemented
 **Working name:** Ink Garden (provisional; see Open Questions)
 
@@ -49,7 +52,7 @@ design: **the organism is data, not pixels.** A genome is a few hundred bytes.
 **Random genomes are mostly ugly.** Sampling sixty loci freely from a hash
 overwhelmingly produces nonsense: a rose with sunflower petals on a grass stem.
 Every generator that looks good samples from a *curated, constrained* region of
-its parameter space. This shapes §4.7 and the build order in §15, and it is the
+its parameter space. This shapes §4.9 and the build order in §15, and it is the
 main risk to the product.
 
 ---
@@ -269,18 +272,21 @@ explainable in one sentence to a non-biologist.
 
 ### 4.2 Locus catalogue
 
-Approximately 60 loci. Discrete loci are where breeding delight lives, because
-recessives hide and reappear.
+**79 loci: 26 discrete, 53 quantitative across 34 distinct traits.** Discrete loci
+are where breeding delight lives, because recessives hide and reappear. Every
+discrete locus also carries an architecture, which is what §4.3 is about and
+which turned out to matter more than the loci themselves.
 
-**Master identity**
+**Master identity, and the canalisation switch**
 
-| Locus | Alleles |
-|---|---|
-| `flower.organ.identity` | sepals petaloid / normal |
-| `flower.doubling` | single / double |
-| `flower.symmetry` | actinomorphic / zygomorphic |
-| `inflorescence.type` | solitary, spike, raceme, panicle, umbel, corymb, head, cyme |
-| `leaf.form` | simple, pinnate, bipinnate, palmate, cordate |
+| Locus | Alleles | Architecture |
+|---|---|---|
+| `flower.organ.identity` | normal / sepals petaloid | homeotic |
+| `flower.doubling` | single / double | homeotic |
+| `flower.canalisation` | decanalised / canalised | homeotic |
+| `flower.symmetry` | actinomorphic / zygomorphic | canalised |
+| `inflorescence.type` | solitary, spike, raceme, panicle, umbel, corymb, head, cyme | canalised |
+| `leaf.form` | simple, pinnate, bipinnate, palmate, cordate | canalised |
 
 **Habit and stem.** Discrete: `habit.determinacy` (determinate, indeterminate),
 `phyllotaxis.pattern` (alternate, decussate, whorled, spiral), `stem.pigment`,
@@ -297,8 +303,10 @@ density, curvature, length. Presence/absence is the cleanest Mendelian trait
 available and thornless roses are a real breeding objective.
 
 **Flower.** Discrete: `petal.shape`, `petal.margin`, `flower.throat`,
-`nectar_guide`. Quantitative: diameter, petal count, petal length, petal width,
-curl, overlap, substance (thin and translucent versus thick and velvety).
+`nectar_guide`. Quantitative: diameter, petal length, petal width, curl,
+overlap, substance (thin and translucent versus thick and velvety).
+
+Note the absence of petal *number*: it is not a polygenic trait. See §4.5.
 
 **Pigment.** The module worth the most investment, because the constraints are
 what turn colour into a puzzle rather than a slider.
@@ -327,7 +335,34 @@ its real lifecycle.
 effects in v1, present so a carbon-budget model can be added later without
 reshaping anyone's genome.
 
-### 4.3 Inheritance
+### 4.3 Trait architecture
+
+Real traits are not all inherited the same way. Treating them uniformly was the
+first pass's most consequential mistake, so every discrete locus now carries an
+`architecture`.
+
+| Architecture | Biology | Examples | Default |
+|---|---|---|---|
+| **Canalised** | Development is robust. "Floral development is remarkably robust in terms of the identity and number of floral organs in each whorl", and that robustness actively suppresses variation the genome already carries | organ identity, symmetry, inflorescence type, leaf form and margin, venation, phyllotaxis, petal shape and margin, flower throat, lifecycle | reference allele near-fixed at 0.99; a species that differs must declare it |
+| **Polymorphic** | Genuinely variable within a species | stem pigment, stem and leaf pubescence, thorn presence, nectar guide, photoperiod response, vernalisation, colour, pigment pattern | reference at 0.5 with the tail spread |
+| **Homeotic** | A rare regulatory change of organ identity. This is where ornamental novelty actually comes from | `flower.doubling`, `flower.organ.identity`, `flower.canalisation`, `leaf.variegation`, `pigment.petal.chlorophyll` | reference at 0.96, so the mutant is uncommon |
+
+Current counts: **11 canalised, 10 polymorphic, 5 homeotic.**
+
+**Why this matters more than it sounds.** With uniform defaults, every unusual
+trait is about 50% likely and the result is a mutant heap rather than a garden.
+A first pass with uniform defaults produced **green petals on 75% of plants**,
+where green flowers are "uncommon in nature" (Li et al. 2026, *Horticulture
+Research*). Architecture-aware defaults brought that to zero in twenty samples.
+
+Standing variation is also modest in reality. In *Cardamine hirsuta*, the
+quantitative trait loci affecting petal number had effects "relatively small in
+comparison with alleles induced by mutagenesis" (Pieper et al. 2016, *New
+Phytologist*). Large strange traits therefore arrive as rare regulatory
+mutations rather than as accumulated small ones, which is exactly why the
+homeotic class is separate.
+
+### 4.4 Inheritance
 
 **One `blend` coefficient per locus**, which buys the full range of dominance
 behaviour for free:
@@ -347,6 +382,13 @@ a heterozygote at a "recessive" locus still shows the dominant allele, which mad
 Codominance matters, because two different anthocyanidins both expressing is how
 real hybrids get mixed colours.
 
+**The reference allele is not always index 0.** Allele order is the dominance
+series, so the dominant allele can be the derived one: `flower.canalisation`
+lists decanalised first so that canalised dominates, yet canalised is the normal
+state and therefore the reference. A `referenceAllele` field records which index
+is wild type. Getting this wrong is not subtle — before the field existed, every
+plant in a sample of sixteen came out decanalised.
+
 **Meiosis is independent assortment per locus.** Loci do not co-segregate as
 though they shared a chromosome; chromosomal linkage is deferred (§18).
 
@@ -361,7 +403,36 @@ The second is real, it happens constantly in plant breeding, and it produces the
 moment where a cross yields something taller or redder than either parent. That
 moment is the entire reason to have genetics instead of a colour picker.
 
-### 4.4 Epistasis
+### 4.5 Canalisation and cryptic variation
+
+The single best mechanic the biology handed us, and it came out of the reading
+rather than the design.
+
+Floral development is robust enough that organ number does not vary, and that
+robustness is *active*: canalisation "prevents the phenotypic expression of
+cryptic genetic variation" (Monniaux et al. 2016, *Annals of Botany*).
+*Cardamine hirsuta* has lost that robustness, and "petal number varies from zero
+to four" as a result; the loss was traced to divergence of the MADS-box
+transcription factor **APETALA1**, "resulting in loss of epistasis over alleles
+that cause petal number to vary" (Rambaud-Lavigne et al. 2025, *Quantitative
+Plant Biology*).
+
+Modelled here as follows.
+
+- `flower.canalisation` gates the trait. While it is intact, petal number is
+  **pinned to the species baseline** and the `petal.variance` loci are silent.
+- When it is lost, that hidden variation is expressed as **petal loss**, ranging
+  from the species value down to zero.
+- **Zero petals is therefore a correct phenotype, not a bug**, which corrects an
+  earlier assumption in this design.
+
+The payoff is a breeding mechanic nobody had to invent: a plant can carry
+variation invisibly for generations and then have it unlock in one cross.
+
+Petal number is consequently **not** a polygenic trait, and `express` does not
+invent one. It is a species trait resolved by `expressPlant`.
+
+### 4.6 Epistasis
 
 A small explicit rule table. This is where realism and surprise come from.
 
@@ -377,14 +448,14 @@ The doubling tradeoff is the one to protect. Double flowers genuinely set less
 seed, which means the most beautiful plant in a garden is also the worst breeder.
 That tension is real and it is the best strategic decision the product offers.
 
-### 4.5 Mutation
+### 4.7 Mutation
 
 Mutation lives inside the same hash as everything else:
 `hash(childName | locusId)`. Reproducible forever. Mutations are **logged and
 surfaced**, because a new trait appearing is the best moment the product can
 deliver and it must never happen silently.
 
-### 4.6 Genome versioning
+### 4.8 Genome versioning
 
 A `genome_version` field, and a migration rule that fills new loci
 deterministically from the plant's own hash. Add a locus in v2 and every existing
@@ -393,7 +464,7 @@ plant gains a consistent new trait rather than a random one or a crash.
 Because bred plants are stored rather than re-derived, a future change to the
 locus list cannot silently turn someone's rose into a different plant.
 
-### 4.7 The beauty constraint
+### 4.9 The beauty constraint
 
 This is the section that determines whether the product holds up.
 
@@ -421,7 +492,39 @@ outright. Nothing a user has grown may ever become unviewable.
 **Breeding inherits from parents**, so lineages naturally stay near the region of
 genome space that already looks good.
 
+Two further mitigations arrived with revision 5, both of which do real work:
+**architecture-aware default frequencies** (§4.3) stop rare traits from being
+common, and **species baselines** (§4.10) bound how far a genome can move any
+trait away from its species character.
+
 ---
+
+### 4.10 Species baselines
+
+Quantitative traits needed a per-species scale, for two different reasons.
+
+- **Canalised traits are fixed per species**, so the baseline *is* the value. A
+  daisy has five petals; the genome has no vote unless canalisation is lost
+  (§4.5).
+- **Quantitative traits are genuinely heritable**, but a tree and a shrub differ
+  in absolute scale even at the same relative trait value. The baseline sets the
+  scale and the genome moves it within a bounded range of plus or minus 50%.
+
+`PhenotypeBaseline` therefore carries petal count, stature, leaf size, flower
+size, stem thickness, and four phenology values: base temperature, thermal
+constant, critical daylength, and vernalisation hours.
+
+**Phenology belongs in the baseline, not on the template.** An earlier draft had
+`thermalConstant` on the species *and* a `thermal.constant` locus, which is two
+sources for one fact — the same error already removed from this specification for
+sunrise and sunset. With phenology in the baseline it is heritable but bounded,
+so a breeder can select an early line or a late line without a species losing its
+character. Measured output for rosemary is 700 to 2100 growing degree days around
+the species value of 1400, daylength 6 to 18 hours, and base temperature 3 to 9 °C.
+
+The engine exposes two layers as a result. `express(genome)` is the genomic
+phenotype and knows no species. `expressPlant(genome, species)` is the plant. That
+split is what keeps the genetics tests independent of any species.
 
 ## 5. Development and growth
 
@@ -476,6 +579,12 @@ Every plant is annual, biennial or perennial, inherited from its lineage.
 
 This is the change that gives the garden age. It is also why the garden is worth
 returning to for years rather than weeks.
+
+All four founding species happen to be perennials, which is botanically correct
+and means the annual and biennial lifecycles are implemented but unexercised. A
+fast annual belongs in the founding set at M0c, both to exercise that code and
+because a plant that completes its life in weeks is a useful contrast to a tree
+that takes years.
 
 ### 5.4 Senescence, and how it stays kind
 
@@ -872,7 +981,7 @@ create table push_subscriptions (
 - **`genome` is stored, not derived.** Once breeding exists, the cultivar name
   cannot be the genome, because two flowers with the same name from different
   parents are different plants. Storing it also protects against a future locus
-  list change turning someone's rose into a different plant. A ~60-locus genome is
+  list change turning someone's rose into a different plant. A 79-locus genome is
   roughly 1 KB of JSON, which is negligible.
 - Sunrise and sunset are **not** stored. Solar position is computed client-side,
   and two sources for one fact would eventually disagree.
@@ -1073,7 +1182,7 @@ switch.
 |---|---|
 | Engine determinism | Golden-file tests: fixed seed strings produce byte-identical output **within** an engine |
 | Cross-engine determinism | Tolerance-based comparison. `Math.sin` and friends are not required to be correctly rounded, and V8 and JavaScriptCore differ in the last bits. All geometry output is quantised to 1e-3 at the phenotype→structure boundary so this cannot change derived state |
-| Cross-runtime agreement | A test that runs the engine under **Node (V8)** and **Bun (JSC)** and diffs the outputs within the same tolerance. This is the pair that matters: V8 computes the CI golden files, JSC is what the user's device runs |
+| Cross-runtime agreement | Run the engine under **Node (V8)** and **Bun (JSC)** and diff. This is the pair that matters: V8 computes the CI golden files, JSC is what the user's device runs. **Verified at M0a**: byte-identical output from both CLIs, including through twelve generations of breeding, because the RNG is integer-only |
 | Browser engine | End-to-end tests run in **Playwright WebKit**, the same engine family as the target device, not Chromium |
 | Genetics: discrete | Punnett-square assertions per epistasis rule, including recessive masking and the doubling interaction |
 | Genetics: quantitative | Statistical tests over thousands of simulated crosses: expected means, expected variance, and the presence of transgressive segregation |
@@ -1136,8 +1245,16 @@ user likes. No silent changes to something a user has grown attached to.
     design rather than a soundtrack.
 12. **Bed size.** How large is one bed before a user should extend? Needs a real
     answer at M6, and should be generous rather than stingy.
-13. **Chromosomal linkage.** Meiosis is independent assortment per locus (§4.3).
+13. **Chromosomal linkage.** Meiosis is independent assortment per locus (§4.4).
     Real linkage would make nearby loci co-segregate, which is more realistic and
     lets breeders use marker traits to predict unseen ones. Deferred because it
     needs a chromosome model, and independent assortment already produces
     plausible pedigrees.
+14. **Homeotic traits drift upward without selection.** Measured at M0a: with no
+    selection, doubling reached 13 of 60 plants by generation ten, because
+    mutation is symmetric and nothing opposes it. In a real population selection
+    holds it down; in the app the user's culling is that pressure. Worth watching
+    rather than fixing, but it means a passive garden slowly becomes a freak
+    show, and that may want a soft constraint.
+15. **An annual species is needed.** All four founding species are perennial, so
+    the annual and biennial lifecycles are unexercised (§5.3). Add one at M0c.

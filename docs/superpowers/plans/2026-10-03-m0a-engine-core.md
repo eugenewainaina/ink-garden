@@ -1,5 +1,45 @@
 # M0a — Engine Core Implementation Plan
 
+> ## STATUS: EXECUTED. Do not follow this plan to write new code.
+>
+> M0a was built from this plan and merged to `main`. **The code and its tests are
+> now the source of truth**, not this document. It is kept because the reasoning
+> and the task decomposition are still useful, and because the corrections below
+> are a record of what building it taught us.
+>
+> Several steps in here are **known wrong**. They are listed rather than edited
+> out, because the pattern of what went wrong is more valuable than a tidy plan:
+> a full surgical rewrite would produce a document describing code that already
+> exists, which nobody should follow either.
+>
+> ### What building this changed
+>
+> | The plan said | The truth | Caught by |
+> |---|---|---|
+> | `secondaryWeight = (1 - blend) / 2` | `blend / 2`. The formula was **inverted**: it gave 0.5 at complete dominance and 0 at codominance, the opposite of the documented meaning | tests |
+> | Incomplete dominance gives `secondaryWeight` 0.5 | 0.25. The test contradicted its own name | tests |
+> | Round-trip test generated alleles `i % 2` and `(i + 1) % 3` | Allele 2 is invalid at two-allele loci. Tests now derive valid alleles from each locus | test failure |
+> | `leaf.form: [0,1,0,0,0]` asserted as allele 2 (bipinnate) | Distribution index **is** allele index, so it selects allele 1 | test failure |
+> | `habit.height` as a single locus | Split into `.a` and `.b`. Two species templates also referenced a non-existent `habit.height.a` | plan self-review |
+> | `petal.count.a/.b` as polygenic loci, range 0 to 2.3 | **Petal number is canalised, not polygenic.** It comes from the species baseline; `petal.variance` is silent cryptic variation gated by `flower.canalisation` | research |
+> | `defaultDistribution` uniform | Architecture-aware: canalised 0.99, polymorphic 0.5, homeotic 0.96 | research, then output inspection |
+> | Doubling multiplied petal count by 1.9, test expected 10 | 9.5 for the test, and the petal multiplication moved out of epistasis into `expressPlant` so the factor exists once | tests |
+> | One `colour.petal.chlorophyll` rule | Two: pure green only when it is the sole pigment, otherwise chlorophyll absorbs and darkens. The single rule was clobbering anthocyanin and carotenoid, turning 10 of 14 wild flowers green | **output inspection** |
+> | Species templates had no size scale | `PhenotypeBaseline` with nine fields, and `expressPlant` to apply it | research |
+> | `thermalBase`/`thermalConstant` on the template | Moved into the baseline. It was two sources for one fact, the same error already removed from the spec for sunrise and sunset | **output inspection** |
+> | No notion of trait architecture | 11 canalised, 10 polymorphic, 5 homeotic | research |
+> | Reference allele implicitly index 0 | An explicit `referenceAllele`. Without it **every** plant in a sample of sixteen came out decanalised | **output inspection** |
+> | 78 loci | 79: 26 discrete, 53 quantitative, 34 distinct traits | count |
+>
+> **The lesson worth keeping:** four of these were caught by tests, five by
+> reading published biology, and **four only by looking at real generated
+> output**. A passing test suite is not evidence that the output is plausible.
+> Run the CLIs and read the numbers before believing anything.
+>
+> The catalogue also grew a `traitMaximum` helper and a distinct
+> `express` / `expressPlant` split; both postdate the tasks below.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build the pure, deterministic genetics core of the Ink Garden engine: a seed string becomes a genome, a genome becomes a phenotype, and two genomes produce a child genome.
