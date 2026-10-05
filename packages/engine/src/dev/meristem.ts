@@ -103,3 +103,90 @@ export function growPhytomers(config: PhytomerConfig): Phytomers {
 
   return { internodes, leaves }
 }
+
+/**
+ * Whether an axillary bud grows out.
+ *
+ * Apical dominance is the suppression of buds by the shoot tip, which is why a
+ * stem grows as one shoot rather than a bush. Modelled directly as a
+ * probability of suppression rather than as a hormone, because a hormone would
+ * be unobservable at this level anyway.
+ */
+export function shouldBranch(
+  apicalDominance: number,
+  nodeIndex: number,
+  r: number,
+): boolean {
+  // The lowest node has no bud worth growing: it is the seed leaf.
+  if (nodeIndex === 0) return false
+  return r >= apicalDominance
+}
+
+export interface ShootConfig {
+  readonly nodes: number
+  readonly pattern: Phyllotaxis
+  readonly internodeLength: number
+  readonly leafLength: number
+  readonly leafWidth: number
+  readonly apicalDominance: number
+  readonly branchAngle: number
+  readonly seed: string
+}
+
+export interface Branch {
+  /** Index of the node whose axillary bud produced this branch. */
+  readonly node: number
+  /** Angle from the parent axis, in degrees. Negative is one side. */
+  readonly angle: number
+  readonly shoot: Shoot
+}
+
+export interface Shoot {
+  readonly internodes: readonly Organ[]
+  readonly leaves: readonly Organ[]
+  readonly branches: readonly Branch[]
+}
+
+/** Two levels of branching is already a shrub; more explodes the organ count. */
+const MAX_BRANCH_DEPTH = 2
+
+/**
+ * Grow a shoot, and let some of its axillary buds become branches.
+ *
+ * Dominance rises with depth and the node count shrinks, both so that a plant
+ * with no dominance at all produces a shrub rather than thousands of organs.
+ */
+export function buildShoot(config: ShootConfig, depth = 0): Shoot {
+  const phytomers = growPhytomers({
+    nodes: config.nodes,
+    pattern: config.pattern,
+    internodeLength: config.internodeLength,
+    leafLength: config.leafLength,
+    leafWidth: config.leafWidth,
+    seed: config.seed,
+  })
+
+  const branches: Branch[] = []
+  if (depth < MAX_BRANCH_DEPTH) {
+    for (let node = 1; node < config.nodes; node += 1) {
+      const r = rngFrom(`branch|${config.seed}|${depth}|${node}`)()
+      if (!shouldBranch(config.apicalDominance, node, r)) continue
+      const side = rngFrom(`side|${config.seed}|${depth}|${node}`)() < 0.5 ? -1 : 1
+      branches.push({
+        node,
+        angle: side * config.branchAngle,
+        shoot: buildShoot(
+          {
+            ...config,
+            nodes: Math.max(2, Math.round(config.nodes * 0.6)),
+            apicalDominance: Math.min(1, config.apicalDominance + 0.15),
+            seed: `${config.seed}|b${depth}|${node}`,
+          },
+          depth + 1,
+        ),
+      })
+    }
+  }
+
+  return { internodes: phytomers.internodes, leaves: phytomers.leaves, branches }
+}
