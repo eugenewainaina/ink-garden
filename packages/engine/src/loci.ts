@@ -91,8 +91,8 @@ const q = (
 export const LOCI: readonly Locus[] = [
   // Master identity. Canalised: organ identity and count are robust, and
   // variation only appears when that robustness is lost.
-  d('flower.organ.identity', ['normal', 'sepals.petaloid'], 1, 'homeotic', 0.002),
-  d('flower.doubling', ['single', 'double'], 1, 'homeotic', 0.006),
+  d('flower.organ.identity', ['sepals.petaloid', 'normal'], 0, 'homeotic', 0.002, 1),
+  d('flower.doubling', ['double', 'single'], 0, 'homeotic', 0.006, 1),
   d('flower.symmetry', ['actinomorphic', 'zygomorphic'], 1, 'canalised'),
   d('inflorescence.type', ['solitary', 'spike', 'raceme', 'panicle', 'umbel', 'corymb', 'head', 'cyme'], 1, 'canalised'),
   d('leaf.form', ['simple', 'pinnate', 'bipinnate', 'palmate', 'cordate'], 1, 'canalised'),
@@ -161,7 +161,7 @@ export const LOCI: readonly Locus[] = [
   // colour, and white is a perfectly plausible default.
   d('pigment.anthocyanidin', ['none', 'pelargonidin', 'cyanidin', 'delphinidin'], 1, 'polymorphic'),
   d('pigment.carotenoid', ['none', 'yellow', 'orange', 'red'], 1, 'polymorphic'),
-  d('pigment.petal.chlorophyll', ['none', 'green'], 1, 'homeotic', 0.003),
+  d('pigment.petal.chlorophyll', ['green', 'none'], 0, 'homeotic', 0.003, 1),
   d('pigment.pattern', ['solid', 'gradient', 'picotee', 'blotch', 'speckled'], 0.5, 'polymorphic'),
   q('pigment.intensity.a', 'pigment.intensity', 0.4),
   q('pigment.intensity.b', 'pigment.intensity', 0.25),

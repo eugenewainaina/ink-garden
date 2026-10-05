@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { createGenome, type Genome } from '../src/genome.ts'
-import { LOCI, locusIndex } from '../src/loci.ts'
+import { LOCI } from '../src/loci.ts'
 import { BASELINE_SPREAD, expressPlant } from '../src/phenotype.ts'
 import type { SpeciesTemplate } from '../src/species.ts'
+import { referenceGenome, setAlleleByName, setQuantitative } from './helpers.ts'
 
 const base = (petalCount: number, stature: number): SpeciesTemplate => ({
   id: 'test',
@@ -25,25 +26,21 @@ const base = (petalCount: number, stature: number): SpeciesTemplate => ({
   distributions: {},
 })
 
-const flat = (): Genome => createGenome(LOCI.map(() => [0, 0] as const))
+const flat = (): Genome => referenceGenome()
 
-function setAllele(genome: Genome, locusId: string, a: number, b: number): Genome {
-  return createGenome(
-    genome.alleles.map((pair, i) =>
-      i === locusIndex(locusId) ? ([a, b] as const) : pair,
-    ),
-  )
-}
-
-/** `flower.canalisation` is ['decanalised', 'canalised'], canalised dominant. */
-const canalised = (g: Genome): Genome => setAllele(g, 'flower.canalisation', 1, 1)
-const decanalised = (g: Genome): Genome => setAllele(g, 'flower.canalisation', 0, 0)
+/** Canalised is the normal state and dominant, so a heterozygote is canalised. */
+const canalised = (g: Genome): Genome =>
+  setAlleleByName(g, 'flower.canalisation', 'canalised', 'canalised')
+const decanalised = (g: Genome): Genome =>
+  setAlleleByName(g, 'flower.canalisation', 'decanalised', 'decanalised')
+const doubled = (g: Genome): Genome =>
+  setAlleleByName(g, 'flower.doubling', 'double', 'double')
 
 describe('canalisation', () => {
   it('pins petal number to the species value while canalisation is intact', () => {
     const template = base(5, 4)
     for (const variance of [0, 1, 2]) {
-      const g = canalised(setAllele(flat(), 'petal.variance.a', variance, variance))
+      const g = canalised(setQuantitative(flat(), 'petal.variance.a', variance, variance))
       expect(expressPlant(g, template).quantitative['petal.count']).toBeCloseTo(5, 10)
     }
   })
@@ -51,8 +48,8 @@ describe('canalisation', () => {
   it('expresses the hidden variation once canalisation is lost', () => {
     const template = base(5, 4)
     const silent = decanalised(flat())
-    const full = decanalised(setAllele(flat(), 'petal.variance.a', 1, 1))
-    const also = decanalised(setAllele(flat(), 'petal.variance.b', 1, 1))
+    const full = decanalised(setQuantitative(flat(), 'petal.variance.a', 1, 1))
+    const also = decanalised(setQuantitative(flat(), 'petal.variance.b', 1, 1))
 
     const zero = expressPlant(silent, template).quantitative['petal.count'] ?? -1
     const some = expressPlant(full, template).quantitative['petal.count'] ?? -1
@@ -72,12 +69,12 @@ describe('canalisation', () => {
 
     // Maximum cryptic variation loses every petal, exactly as Cardamine
     // hirsuta ranges from four down to zero.
-    let maxed = setAllele(flat(), 'petal.variance.a', 1, 1)
-    maxed = setAllele(maxed, 'petal.variance.b', 1, 1)
+    let maxed = setQuantitative(flat(), 'petal.variance.a', 1, 1)
+    maxed = setQuantitative(maxed, 'petal.variance.b', 1, 1)
     const zero = expressPlant(decanalised(maxed), template)
     expect(zero.quantitative['petal.count']).toBeCloseTo(0, 10)
 
-    const partial = decanalised(setAllele(flat(), 'petal.variance.a', 1, 1))
+    const partial = decanalised(setQuantitative(flat(), 'petal.variance.a', 1, 1))
     const value = expressPlant(partial, template).quantitative['petal.count'] ?? -1
     expect(value).toBeGreaterThan(0)
     expect(value).toBeLessThan(5)
@@ -94,8 +91,8 @@ describe('canalisation', () => {
 describe('the doubling mutation', () => {
   it('multiplies the canalised petal count', () => {
     const template = base(5, 4)
-    const doubled = canalised(setAllele(flat(), 'flower.doubling', 1, 1))
-    expect(expressPlant(doubled, template).quantitative['petal.count']).toBeCloseTo(
+    const plant = canalised(doubled(flat()))
+    expect(expressPlant(plant, template).quantitative['petal.count']).toBeCloseTo(
       9.5,
       10,
     )
@@ -103,10 +100,12 @@ describe('the doubling mutation', () => {
 
   it('also costs fertility, which lives in the epistasis layer', () => {
     const template = base(5, 4)
-    const doubled = canalised(setAllele(flat(), 'flower.doubling', 1, 1))
-    const single = canalised(flat())
-    expect(expressPlant(doubled, template).quantitative['flower.fertility']).toBeLessThan(
-      expressPlant(single, template).quantitative['flower.fertility'] ?? 0,
+    const doublePlant = canalised(doubled(flat()))
+    const singlePlant = canalised(flat())
+    expect(
+      expressPlant(doublePlant, template).quantitative['flower.fertility'],
+    ).toBeLessThan(
+      expressPlant(singlePlant, template).quantitative['flower.fertility'] ?? 0,
     )
   })
 })
@@ -138,7 +137,7 @@ describe('species baselines scale quantitative traits', () => {
 
   it('is deterministic', () => {
     const template = base(5, 4)
-    const g = decanalised(setAllele(flat(), 'petal.variance.a', 1, 0))
+    const g = decanalised(setQuantitative(flat(), 'petal.variance.a', 1, 0))
     expect(expressPlant(g, template)).toEqual(expressPlant(g, template))
   })
 })

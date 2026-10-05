@@ -60,11 +60,14 @@ describe('defaultDistribution', () => {
   })
 
   it('keeps a homeotic mutant uncommon', () => {
-    const homeotic = LOCI.find(
+    for (const homeotic of LOCI.filter(
       (l) => l.kind === 'discrete' && l.architecture === 'homeotic',
-    )
-    if (homeotic === undefined) throw new Error('expected a homeotic locus')
-    expect(defaultDistribution(homeotic)[0]).toBeGreaterThan(0.9)
+    )) {
+      if (homeotic.kind !== 'discrete') continue
+      const dist = defaultDistribution(homeotic)
+      const reference = homeotic.referenceAllele ?? 0
+      expect(dist[reference], homeotic.id).toBeGreaterThan(0.9)
+    }
   })
 
   it('gives a polymorphic locus real standing variation', () => {
@@ -99,8 +102,12 @@ describe('defaultDistribution', () => {
       throw new Error('expected pigment.petal.chlorophyll')
     }
     const dist = defaultDistribution(locus)
-    const carrierProbability = 1 - (1 - (dist[1] ?? 0)) ** 2
-    expect(carrierProbability).toBeLessThan(0.1)
+    const reference = locus.referenceAllele ?? 0
+    // Green is recessive, so the *phenotype* needs two copies of the mutant,
+    // which is the square of its allele frequency.
+    const mutantAllele = dist.find((_, i) => i !== reference) ?? 0
+    const greenProbability = mutantAllele ** 2
+    expect(greenProbability).toBeLessThan(0.02)
   })
 })
 

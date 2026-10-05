@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createGenome, type Genome } from '../src/genome.ts'
+import { referenceGenome } from './helpers.ts'
 import {
   LOCI,
   locusIndex,
@@ -86,7 +87,9 @@ describe('resolveDiscrete', () => {
   })
 })
 
-const flat = (): Genome => createGenome(LOCI.map(() => [0, 0] as const))
+// The reference allele, not index 0: see test/helpers.ts for why that
+// distinction matters.
+const flat = (): Genome => referenceGenome()
 
 function setAllele(genome: Genome, locusId: string, a: number, b: number): Genome {
   const alleles = genome.alleles.map((pair, i) =>
