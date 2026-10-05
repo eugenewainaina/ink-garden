@@ -153,6 +153,12 @@ export const ROSEMARY: SpeciesTemplate = {
     'leaf.margin': [1, 0, 0, 0],
     'leaf.venation': [1, 0, 0],
     'phyllotaxis.pattern': [0.9, 0.1, 0, 0],
+    // A bushy shrub: buds are suppressed about half the time and branches
+    // leave the stem at a wide angle.
+    'branch.apical_dominance.a': [0.45, 0.55],
+    'branch.apical_dominance.b': [0.45, 0.55],
+    'branch.angle.a': [0.4, 0.6],
+    'branch.angle.b': [0.4, 0.6],
     'stem.pigment': [0.25, 0.75],
     'thorn.presence': [0.05, 0.95],
     'inflorescence.type': [0.08, 0.62, 0.25, 0.05, 0, 0, 0, 0],
@@ -196,6 +202,9 @@ export const DANDELION: SpeciesTemplate = {
     'leaf.margin': [0, 0, 1, 0],
     'leaf.venation': [1, 0, 0],
     'phyllotaxis.pattern': [0.1, 0.05, 0.05, 0.8],
+    // A dandelion has one scape and does not branch. Nearly total dominance.
+    'branch.apical_dominance.a': [0.03, 0.97],
+    'branch.apical_dominance.b': [0.03, 0.97],
     'thorn.presence': [1, 0],
     'inflorescence.type': [0.04, 0, 0, 0, 0, 0, 0.96, 0],
     'flower.symmetry': [1, 0],
@@ -234,6 +243,9 @@ export const SPEARMINT: SpeciesTemplate = {
     'leaf.margin': [0, 1, 0, 0],
     'leaf.venation': [1, 0, 0],
     'phyllotaxis.pattern': [0, 0.95, 0.05, 0],
+    // A mint spreads by runners rather than branching much.
+    'branch.apical_dominance.a': [0.4, 0.6],
+    'branch.apical_dominance.b': [0.4, 0.6],
     'stem.pigment': [1, 0],
     'thorn.presence': [1, 0],
     'inflorescence.type': [0.05, 0.35, 0.55, 0.05, 0, 0, 0, 0],
@@ -244,7 +256,6 @@ export const SPEARMINT: SpeciesTemplate = {
     'photoperiod.response': [0.2, 0.3, 0.5],
     'vernalization.required': [1, 0],
     'habit.height.a': [0.55, 0.45],
-    'branch.apical_dominance.a': [0.8, 0.2],
     'lifecycle': [0, 0, 1],
   },
 }
@@ -272,6 +283,12 @@ export const JACARANDA: SpeciesTemplate = {
     'leaf.margin': [1, 0, 0, 0],
     'leaf.venation': [1, 0, 0],
     'phyllotaxis.pattern': [0, 0.1, 0, 0.9],
+    // A tree: a single trunk for metres before it forks, and branches that
+    // leave at a narrower angle than a shrub's.
+    'branch.apical_dominance.a': [0.1, 0.9],
+    'branch.apical_dominance.b': [0.1, 0.9],
+    'branch.angle.a': [0.3, 0.7],
+    'branch.angle.b': [0.3, 0.7],
     'thorn.presence': [0.96, 0.04],
     'inflorescence.type': [0.05, 0, 0.05, 0.9, 0, 0, 0, 0],
     'flower.symmetry': [0, 1],

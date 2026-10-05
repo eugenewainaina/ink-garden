@@ -127,6 +127,33 @@ export function express(genome: Genome): Phenotype {
   return expressMutable(genome)
 }
 
+/**
+ * Internode length scales as the square root of stature, not linearly.
+ *
+ * Scaling it linearly gave a jacaranda sixteen-centimetre internodes, which is
+ * wrong by a factor of three: a real tree of that size has internodes of a few
+ * centimetres, and reaches its height by making *many* of them rather than long
+ * ones. It also made the leaves invisible, because a leaf keeps its own size
+ * while the internodes it sits between grow, so the foliage shrank to two
+ * percent of the plant's height against a rosemary's seven.
+ *
+ * Square-root scaling is the right shape for this: length grows with size, just
+ * far more slowly. Rosemary comes out at 2.8 centimetres and a jacaranda at
+ * 7.2, which is what you would measure.
+ */
+const INTERNODE_COEFFICIENT = 1.6
+
+/**
+ * A quantitative trait as a fraction of the largest value it could reach.
+ *
+ * Exported because geometry needs it too: traits like `branch.angle` are stored
+ * normalised and reach a renderer as 0.13 when it wants degrees. See
+ * `dev/shoot.ts`, which maps normalised traits onto physical ranges.
+ */
+export function normalisedTrait(phenotype: Phenotype, trait: string): number {
+  return normalised(phenotype as MutablePhenotype, trait)
+}
+
 /** A quantitative trait as a fraction of the largest value it could reach. */
 function normalised(phenotype: MutablePhenotype, trait: string): number {
   const max = traitMaximum(trait)
@@ -146,7 +173,7 @@ const SCALED_BY_BASELINE: ReadonlyArray<{
   readonly field: keyof PhenotypeBaseline
 }> = [
   { trait: 'height', field: 'stature' },
-  { trait: 'internode.length', field: 'stature' },
+  // internode.length is deliberately NOT here: see INTERNODE_COEFFICIENT.
   { trait: 'stem.thickness', field: 'stemThickness' },
   { trait: 'leaf.length', field: 'leafSize' },
   { trait: 'leaf.width', field: 'leafSize' },
@@ -192,6 +219,12 @@ export function expressPlant(
       normalised(phenotype, trait),
     )
   }
+
+  // The one trait that does not scale linearly with its baseline.
+  phenotype.quantitative['internode.length'] = scaleAround(
+    INTERNODE_COEFFICIENT * Math.sqrt(Math.max(0, template.baseline.stature)),
+    normalised(phenotype, 'internode.length'),
+  )
 
   const canalised =
     phenotype.discrete['flower.canalisation']?.expressed[0] === 'canalised'
