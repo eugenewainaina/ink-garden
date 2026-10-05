@@ -1,0 +1,16 @@
+# Terms that must never appear in a commit on this repository.
+#
+# This file is committed as a template. The real list lives in
+# .forbidden-terms.txt, which is gitignored, because a committed file listing
+# the forbidden names would itself be the leak.
+#
+# One term per line. Case-insensitive. Blank lines and lines starting with #
+# are ignored.
+#
+# Setup, once per clone:
+#   git config core.hooksPath .githooks
+#   cp .forbidden-terms.example.txt .forbidden-terms.txt
+#   $EDITOR .forbidden-terms.txt
+#
+# Example (not real):
+#   someones-real-name

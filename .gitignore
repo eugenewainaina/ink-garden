@@ -21,3 +21,7 @@ research/
 
 # pnpm store created inside the workspace
 .pnpm-store/
+
+# Forbidden-term list for the pre-push guard. Never commit this file:
+# a committed list of the names would itself be the leak.
+.forbidden-terms.txt

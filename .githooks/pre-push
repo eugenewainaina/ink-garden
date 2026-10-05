@@ -1,0 +1,73 @@
+#!/bin/sh
+#
+# Hard pre-push gate.
+#
+# Refuses to push if any commit in the push range contains a term listed in
+# .forbidden-terms.txt. The term list is deliberately NOT committed, because a
+# file listing the forbidden names would itself be the leak.
+#
+# This hook fails closed in two ways:
+#   1. If .forbidden-terms.txt is missing, it refuses to push.
+#   2. If the file contains no terms, it refuses to push.
+# A guard that silently checks nothing is worse than no guard, because it
+# looks like one. Both failure modes are deliberate and must not be softened
+# into warnings.
+#
+# Setup, once per clone:
+#   git config core.hooksPath .githooks
+#   cp .forbidden-terms.example.txt .forbidden-terms.txt   # then edit it
+
+set -eu
+
+root=$(git rev-parse --show-toplevel)
+terms_file="$root/.forbidden-terms.txt"
+zero=0000000000000000000000000000000000000000
+
+if [ ! -f "$terms_file" ]; then
+  echo "pre-push: REFUSING TO PUSH." >&2
+  echo "  No term list at .forbidden-terms.txt, so this guard would check nothing." >&2
+  echo "  Fix:  cp .forbidden-terms.example.txt .forbidden-terms.txt   then edit it." >&2
+  exit 1
+fi
+
+if ! grep -qvE '^[[:space:]]*(#|$)' "$terms_file"; then
+  echo "pre-push: REFUSING TO PUSH." >&2
+  echo "  .forbidden-terms.txt contains no terms, so this guard would check nothing." >&2
+  exit 1
+fi
+
+commits=""
+while read -r _local_ref local_sha _remote_ref remote_sha; do
+  [ "$local_sha" = "$zero" ] && continue
+  if [ "$remote_sha" = "$zero" ]; then
+    range="$local_sha"
+  else
+    range="$remote_sha..$local_sha"
+  fi
+  found=$(git rev-list "$range" 2>/dev/null || true)
+  commits="$commits $found"
+done
+
+if [ -z "$(echo "$commits" | tr -d '[:space:]')" ]; then
+  exit 0
+fi
+
+status=0
+while IFS= read -r term; do
+  case "$term" in ''|'#'*) continue ;; esac
+  for c in $commits; do
+    if git grep -qiF -- "$term" "$c" -- . 2>/dev/null; then
+      echo "pre-push: BLOCKED. \"$term\" appears in commit $c:" >&2
+      git grep -niF -- "$term" "$c" -- . 2>/dev/null | head -5 | sed 's/^/    /' >&2
+      status=1
+    fi
+  done
+done < "$terms_file"
+
+if [ "$status" -ne 0 ]; then
+  echo "" >&2
+  echo "pre-push: push refused. Remove the content, or rewrite the history." >&2
+  exit 1
+fi
+
+exit 0
