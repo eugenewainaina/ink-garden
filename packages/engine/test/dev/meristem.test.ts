@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { makeOrgan } from '../../src/dev/structure.ts'
 import {
   GOLDEN_ANGLE,
   growPhytomers,
@@ -7,6 +8,8 @@ import {
   phyllotaxisAngle,
   shouldBranch,
   buildShoot,
+  layoutShoot,
+  projectLeaf,
   type PhytomerConfig,
   type Shoot,
   type ShootConfig,
@@ -151,14 +154,41 @@ describe('growPhytomers', () => {
     expect(new Set(angles.map((a) => Math.round(a))).size).toBeGreaterThan(5)
   })
 
-  it('places a decussate pair at right angles, unlike a spiral', () => {
-    const angles = growPhytomers({ ...config, pattern: 'decussate' }).leaves.map(
-      (o) => o.transform.angle,
-    )
-    // The first pair is at 0 and 180, the second at 90 and 270.
-    expect(Math.round(angles[0] ?? 0)).toBe(0)
-    expect(Math.round(angles[1] ?? 0)).toBe(180)
-    expect(Math.round(angles[2] ?? 0)).toBe(90)
+  it('draws a decussate pair to opposite sides, then a foreshortened pair', () => {
+    const leaves = growPhytomers({ ...config, pattern: 'decussate' }).leaves
+    // Node 0 carries azimuths 0 and 180, so its pair points clear of the stem
+    // in opposite directions. Node 1 carries 90 and 270, so its pair points at
+    // the viewer and is drawn short and parallel to the stem.
+    expect(leaves[0]?.transform.angle).toBeGreaterThan(30)
+    expect(leaves[1]?.transform.angle).toBeLessThan(-30)
+    expect(leaves[0]?.transform.scale).toBeCloseTo(1, 6)
+    expect(leaves[1]?.transform.scale).toBeCloseTo(1, 6)
+    expect(Math.abs(leaves[2]?.transform.angle ?? 99)).toBeLessThan(5)
+    expect(leaves[2]?.transform.scale).toBeLessThan(0.7)
+  })
+
+  it('alternates an alternate-leaved plant to opposite sides', () => {
+    const leaves = growPhytomers({ ...config, pattern: 'alternate' }).leaves
+    expect(leaves[0]?.transform.angle).toBeGreaterThan(30)
+    expect(leaves[1]?.transform.angle).toBeLessThan(-30)
+    expect(leaves[2]?.transform.angle).toBeGreaterThan(30)
+  })
+
+  it('draws a leaf along the stem only when it is foreshortened', () => {
+    // Every leaf used to be collinear with the stem, because an azimuth was
+    // used as an angle from vertical and alternate phyllotaxis gives 0 and 180.
+    // A leaf parallel to the stem is legitimate only when it points at the
+    // viewer, which is what the projection scale records.
+    for (const pattern of ['alternate', 'decussate', 'whorled', 'spiral'] as const) {
+      for (const leaf of growPhytomers({ ...config, pattern }).leaves) {
+        const angled = Math.abs(leaf.transform.angle) > 15
+        const foreshortened = leaf.transform.scale < 0.7
+        expect(
+          angled || foreshortened,
+          `${pattern} leaf at ${leaf.transform.angle.toFixed(1)} deg, scale ${leaf.transform.scale.toFixed(2)}`,
+        ).toBe(true)
+      }
+    }
   })
 
   it('handles zero nodes without producing organs or throwing', () => {
@@ -284,5 +314,137 @@ describe('buildShoot', () => {
     const empty = buildShoot({ ...shootConfig, nodes: 0 })
     expect(empty.internodes).toEqual([])
     expect(empty.branches).toEqual([])
+  })
+})
+
+describe('layoutShoot', () => {
+  const simple: Shoot = {
+    internodes: [
+      makeOrgan('internode', { x: 0, y: 0, angle: 0, scale: 1 }, 10, 0.1),
+      makeOrgan('internode', { x: 0, y: 10, angle: 0, scale: 1 }, 10, 0.1),
+    ],
+    leaves: [makeOrgan('leaf', { x: 0, y: 10, angle: 90, scale: 1 }, 5, 1)],
+    branches: [],
+  }
+
+  it('lays a vertical stem from the origin upward', () => {
+    const segments = layoutShoot(simple)
+    const stems = segments.filter((s) => s.kind === 'internode')
+    expect(stems.length).toBe(2)
+    expect(stems[0]?.x1).toBeCloseTo(0, 6)
+    expect(stems[0]?.y1).toBeCloseTo(0, 6)
+    expect(stems[0]?.y2).toBeCloseTo(10, 6)
+    expect(stems[1]?.y1).toBeCloseTo(10, 6)
+    expect(stems[1]?.y2).toBeCloseTo(20, 6)
+  })
+
+  it('is empty for an empty shoot', () => {
+    expect(layoutShoot({ internodes: [], leaves: [], branches: [] })).toEqual([])
+  })
+
+  it('attaches a leaf at its node and sends it out at its angle', () => {
+    const leaf = layoutShoot(simple).find((s) => s.kind === 'leaf')
+    if (leaf === undefined) throw new Error('expected a leaf')
+    // Node 0 is at height 10, and the leaf points 90 degrees, which is +x.
+    expect(leaf.y1).toBeCloseTo(10, 6)
+    expect(leaf.x2).toBeCloseTo(5, 6)
+    expect(leaf.y2).toBeCloseTo(10, 6)
+  })
+
+  it('leans the whole shoot when given a base angle', () => {
+    const stems = layoutShoot(simple, 0, 0, 90).filter((s) => s.kind === 'internode')
+    // A 90 degree base angle points along +x, so the stem runs sideways.
+    expect(stems[1]?.x2).toBeCloseTo(20, 6)
+    expect(stems[1]?.y2).toBeCloseTo(0, 6)
+  })
+
+  it('rotates a branch to its own angle relative to the parent', () => {
+    const branched: Shoot = {
+      internodes: [makeOrgan('internode', { x: 0, y: 0, angle: 0, scale: 1 }, 10, 0.1)],
+      leaves: [],
+      branches: [
+        {
+          node: 0,
+          angle: 45,
+          shoot: {
+            internodes: [
+              makeOrgan('internode', { x: 0, y: 0, angle: 0, scale: 1 }, 10, 0.1),
+            ],
+            leaves: [],
+            branches: [],
+          },
+        },
+      ],
+    }
+    const stems = layoutShoot(branched).filter((s) => s.kind === 'internode')
+    const branchStem = stems[1]
+    if (branchStem === undefined) throw new Error('expected a branch stem')
+    // Starts at the top of the parent internode, then leans 45 degrees.
+    expect(branchStem.x1).toBeCloseTo(0, 6)
+    expect(branchStem.y1).toBeCloseTo(10, 6)
+    expect(branchStem.x2).toBeCloseTo(Math.sin(Math.PI / 4) * 10, 6)
+    expect(branchStem.y2).toBeCloseTo(10 + Math.cos(Math.PI / 4) * 10, 6)
+  })
+
+  it('is deterministic', () => {
+    expect(layoutShoot(simple)).toEqual(layoutShoot(simple))
+  })
+
+  it('produces one segment per internode and leaf across a real shoot', () => {
+    const shoot = buildShoot({
+      nodes: 8,
+      pattern: 'spiral',
+      internodeLength: 6,
+      leafLength: 4,
+      leafWidth: 1,
+      apicalDominance: 0.5,
+      branchAngle: 40,
+      seed: 'layout',
+    })
+    const segments = layoutShoot(shoot)
+    expect(segments.length).toBeGreaterThan(0)
+    expect(segments.some((s) => s.kind === 'leaf')).toBe(true)
+    expect(segments.some((s) => s.kind === 'internode')).toBe(true)
+    for (const segment of segments) {
+      expect(Number.isFinite(segment.x2)).toBe(true)
+      expect(Number.isFinite(segment.y2)).toBe(true)
+    }
+  })
+})
+
+describe('projectLeaf', () => {
+  it('draws a leaf at azimuth zero clear of the stem, at full length', () => {
+    const projected = projectLeaf(0)
+    expect(projected.angle).toBeCloseTo(55, 6)
+    expect(projected.scale).toBeCloseTo(1, 6)
+  })
+
+  it('draws a leaf at azimuth 180 to the opposite side', () => {
+    const projected = projectLeaf(180)
+    expect(projected.angle).toBeCloseTo(-55, 6)
+    expect(projected.scale).toBeCloseTo(1, 6)
+  })
+
+  it('foreshortens a leaf pointing at the viewer', () => {
+    const projected = projectLeaf(90)
+    expect(projected.angle).toBeCloseTo(0, 6)
+    expect(projected.scale).toBeLessThan(0.7)
+    expect(projected.scale).toBeGreaterThan(0.5)
+  })
+
+  it('keeps the scale within zero and one for every azimuth', () => {
+    for (let azimuth = 0; azimuth < 360; azimuth += 7) {
+      const projected = projectLeaf(azimuth)
+      expect(projected.scale).toBeGreaterThan(0)
+      expect(projected.scale).toBeLessThanOrEqual(1.0000001)
+      expect(Math.abs(projected.angle)).toBeLessThanOrEqual(56)
+    }
+  })
+
+  it('mirrors in the picture plane, which is azimuth 180 apart', () => {
+    // Not 320: azimuths 40 and 320 differ in depth, not in the plane, and both
+    // project to the same place. The in-plane mirror of 40 is 140.
+    expect(projectLeaf(140).angle).toBeCloseTo(-projectLeaf(40).angle, 6)
+    expect(projectLeaf(320).angle).toBeCloseTo(projectLeaf(40).angle, 6)
   })
 })

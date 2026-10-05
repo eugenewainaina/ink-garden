@@ -1,6 +1,8 @@
 import { rngFrom } from '../rng.ts'
 import { makeOrgan, type Organ } from './structure.ts'
 
+const DEG_TO_RAD = Math.PI / 180
+
 /**
  * How successive leaves are arranged around the stem.
  *
@@ -39,10 +41,54 @@ export function leavesPerNode(pattern: Phyllotaxis): number {
   }
 }
 
-/** Angle of the first leaf at a node, in degrees from zero. */
+/**
+ * The azimuth of the first leaf at a node: its rotation *around* the stem, in
+ * degrees.
+ *
+ * This is emphatically not the angle a renderer draws the leaf at. An azimuth
+ * is a rotation around an axis; a drawing needs a direction in the picture
+ * plane. Confusing the two put every leaf collinear with the stem, because
+ * alternate phyllotaxis gives azimuths of 0 and 180, and a leaf drawn at 0
+ * degrees from vertical points straight up the stem. Use `projectLeaf` for
+ * drawing.
+ */
 export function nextBudAngle(pattern: Phyllotaxis, nodeIndex: number): number {
   const raw = nodeIndex * phyllotaxisAngle(pattern)
   return ((raw % 360) + 360) % 360
+}
+
+/** How far a leaf stands out from the stem, in degrees. */
+export const LEAF_DIVERGENCE_DEG = 55
+
+/**
+ * Project a leaf's position around the stem onto the picture plane.
+ *
+ * A leaf attaches at `divergence` degrees from the stem axis and points in the
+ * radial direction given by its azimuth. Viewed from the side, that direction
+ * has an in-plane component `sin(divergence) * cos(azimuth)` horizontally and
+ * `cos(divergence)` vertically, so:
+ *
+ *   - a leaf at azimuth 0 points clear of the stem and is drawn full length
+ *   - a leaf at azimuth 180 points the other way, giving the ladder an
+ *     alternate-leaved plant actually has
+ *   - a leaf at azimuth 90 points at the viewer, foreshortens to `cos(divergence)`
+ *     of its length, and is drawn nearly parallel to the stem
+ *
+ * The foreshortening is returned as a scale rather than baked into the length,
+ * so the organ keeps its true size and only its projection is shortened.
+ */
+export function projectLeaf(
+  azimuthDeg: number,
+  divergenceDeg = LEAF_DIVERGENCE_DEG,
+): { readonly angle: number; readonly scale: number } {
+  const azimuth = azimuthDeg * DEG_TO_RAD
+  const divergence = divergenceDeg * DEG_TO_RAD
+  const dx = Math.sin(divergence) * Math.cos(azimuth)
+  const dy = Math.cos(divergence)
+  return {
+    angle: Math.atan2(dx, dy) / DEG_TO_RAD,
+    scale: Math.hypot(dx, dy),
+  }
 }
 
 export interface PhytomerConfig {
@@ -86,14 +132,22 @@ export function growPhytomers(config: PhytomerConfig): Phytomers {
 
     const perNode = leavesPerNode(config.pattern)
     for (let i = 0; i < perNode; i += 1) {
-      const base = nextBudAngle(config.pattern, node)
-      const angle = base + (i * 360) / perNode
+      const azimuth = nextBudAngle(config.pattern, node) + (i * 360) / perNode
       const leafR = rngFrom(`leaf|${config.seed}|${node}|${i}`)
       const leafLength = config.leafLength * (0.8 + leafR() * 0.4)
+      // Divergence varies a little per leaf, because a plant whose leaves all
+      // leave at exactly the same angle reads as a diagram.
+      const divergence = LEAF_DIVERGENCE_DEG * (0.8 + leafR() * 0.4)
+      const projected = projectLeaf(azimuth, divergence)
       leaves.push(
         makeOrgan(
           'leaf',
-          { x: 0, y: heightSoFar, angle: ((angle % 360) + 360) % 360, scale: 1 },
+          {
+            x: 0,
+            y: heightSoFar,
+            angle: projected.angle,
+            scale: projected.scale,
+          },
           leafLength,
           config.leafWidth,
         ),
@@ -189,4 +243,109 @@ export function buildShoot(config: ShootConfig, depth = 0): Shoot {
   }
 
   return { internodes: phytomers.internodes, leaves: phytomers.leaves, branches }
+}
+
+/** A line from one point to another, in absolute plant coordinates, y upward. */
+export interface Segment {
+  readonly kind: Organ['kind']
+  readonly x1: number
+  readonly y1: number
+  readonly x2: number
+  readonly y2: number
+  readonly width: number
+}
+
+/**
+ * Flatten a shoot into absolute line segments, composing transforms through the
+ * parent chain.
+ *
+ * The plan's first draft offset a branch sideways without rotating it, which is
+ * enough to place organs but useless for looking at, because whether branches
+ * *lean* is exactly the question a silhouette answers. This composes properly
+ * instead: an angle is measured from vertical, anticlockwise, and each child's
+ * angle is relative to its parent's.
+ *
+ * `y` grows upward, as a plant does. A renderer flips it, because SVG and
+ * canvas grow downward.
+ */
+export function layoutShoot(
+  shoot: Shoot,
+  originX = 0,
+  originY = 0,
+  baseAngle = 0,
+): readonly Segment[] {
+  const out: Segment[] = []
+  walkShoot(shoot, originX, originY, baseAngle, out)
+  return out
+}
+
+function walkShoot(
+  shoot: Shoot,
+  originX: number,
+  originY: number,
+  baseAngle: number,
+  out: Segment[],
+): void {
+  let x = originX
+  let y = originY
+  let angle = baseAngle
+
+  // The absolute position of each node, recorded as the axis is walked. Exact
+  // even if the axis bends, which it does not yet but will.
+  const nodes: { x: number; y: number }[] = []
+  // A leaf's own y is the distance along the axis at its node, recorded when
+  // the phytomer was built, so it identifies its node exactly.
+  const alongByNode: number[] = []
+  let along = 0
+
+  for (const internode of shoot.internodes) {
+    const here = angle + internode.transform.angle
+    const radians = here * DEG_TO_RAD
+    const nextX = x + internode.length * Math.sin(radians)
+    const nextY = y + internode.length * Math.cos(radians)
+    out.push({
+      kind: 'internode',
+      x1: x,
+      y1: y,
+      x2: nextX,
+      y2: nextY,
+      width: internode.width,
+    })
+    x = nextX
+    y = nextY
+    angle = here
+    along += internode.length
+    nodes.push({ x, y })
+    alongByNode.push(along)
+  }
+
+  const nodeFromAlong = (height: number): number => {
+    for (let i = 0; i < alongByNode.length; i += 1) {
+      if (Math.abs((alongByNode[i] ?? 0) - height) < 1e-9) return i
+    }
+    return -1
+  }
+
+  for (const leaf of shoot.leaves) {
+    const node = nodeFromAlong(leaf.transform.y)
+    const stem = nodes[node]
+    if (stem === undefined) continue
+    const radians = (angle + leaf.transform.angle) * DEG_TO_RAD
+    // A projected leaf is shorter than it is, which is what `scale` carries.
+    const drawn = leaf.length * leaf.transform.scale
+    out.push({
+      kind: 'leaf',
+      x1: stem.x,
+      y1: stem.y,
+      x2: stem.x + drawn * Math.sin(radians),
+      y2: stem.y + drawn * Math.cos(radians),
+      width: leaf.width,
+    })
+  }
+
+  for (const branch of shoot.branches) {
+    const stem = nodes[branch.node]
+    if (stem === undefined) continue
+    walkShoot(branch.shoot, stem.x, stem.y, angle + branch.angle, out)
+  }
 }
