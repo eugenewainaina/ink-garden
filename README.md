@@ -13,6 +13,7 @@ and the engine exists but there is no app around it yet.
 
 | Path | What it is |
 |---|---|
+| `docs/how-ink-garden-works.md` | **Start here.** How the mechanics work end to end, traced through one real flower |
 | `docs/superpowers/specs/2026-10-03-flower-garden-design.md` | The design. Genome, development, weather, data model, milestones, and the reasoning behind each choice |
 | `docs/superpowers/plans/2026-10-03-m0a-engine-core.md` | The M0a implementation plan, task by task |
 | `packages/engine` | The genetics engine. Pure TypeScript, no runtime dependencies, isomorphic |
