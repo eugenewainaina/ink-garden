@@ -161,6 +161,10 @@ export const ROSEMARY: SpeciesTemplate = {
     'pigment.anthocyanidin': [0.05, 0.1, 0.25, 0.6],
     'pigment.carotenoid': [1, 0, 0, 0],
     'photoperiod.response': [0.3, 0.4, 0.3],
+    // Rosemary does not need a winter to flower. Leaving this undeclared gave
+    // it the polymorphic default, which made most plants demand chilling they
+    // could never get in Nairobi, and they held at bud forever.
+    'vernalization.required': [1, 0],
     'habit.height.a': [0.7, 0.3],
     'leaf.length.a': [0.85, 0.15],
     'leaf.width.a': [0.95, 0.05],
@@ -200,6 +204,7 @@ export const DANDELION: SpeciesTemplate = {
     'pigment.anthocyanidin': [1, 0, 0, 0],
     'pigment.carotenoid': [0.05, 0.85, 0.1, 0],
     'photoperiod.response': [0.7, 0.2, 0.1],
+    'vernalization.required': [1, 0],
     'habit.height.a': [0.8, 0.2],
     'thermal.constant.a': [0.85, 0.15],
     'lifecycle': [0, 0, 1],
@@ -237,6 +242,7 @@ export const SPEARMINT: SpeciesTemplate = {
     'pigment.anthocyanidin': [0.1, 0.6, 0.25, 0.05],
     'pigment.carotenoid': [1, 0, 0, 0],
     'photoperiod.response': [0.2, 0.3, 0.5],
+    'vernalization.required': [1, 0],
     'habit.height.a': [0.55, 0.45],
     'branch.apical_dominance.a': [0.8, 0.2],
     'lifecycle': [0, 0, 1],
