@@ -117,7 +117,18 @@ export function flowerShapes(
   // and applying the strap aspect of `ligulate` twice made them needles a pixel
   // wide. The lobe width is therefore set here and the term's aspect is undone.
   const aspect = LEAF_OUTLINES[outline]?.aspect ?? 1
-  const petalWidth = (petalLength * (isHead ? 0.42 : 0.55)) / Math.max(0.1, aspect)
+  // `petal.overlap` widens the lobe, which is what overlap physically is: a
+  // flower whose petals touch has wide petals, and one whose petals stand apart
+  // has narrow ones. It has been a locus from the beginning and the width was
+  // hardcoded at just over a half.
+  const overlap = 0.55 + normalisedTrait(phenotype, 'petal.overlap') * 1.0
+  // `petal.substance` is thickness, and a thin petal is more translucent: it
+  // catches more light and reads paler than a thick one of the same pigment.
+  const substance = normalisedTrait(phenotype, 'petal.substance')
+  const petalWidth = (petalLength * (isHead ? 0.42 : 0.55) * overlap) / Math.max(0.1, aspect)
+  // `petal.curl` bends the lobe. A petal that curls back is the difference
+  // between a flat daisy and a reflexed one, and it was fixed at 0.4.
+  const curl = normalisedTrait(phenotype, 'petal.curl') * 1.7
 
   const out: { points: readonly Point[]; fill: string }[] = []
   const centre = { x: organ.x, y: organ.y }
@@ -326,7 +337,7 @@ export function flowerShapes(
         margin,
         seed: `${seed}|petal|${i}`,
         // A petal curls; a ligule is flat.
-        curve: isHead ? 0.1 : 0.4,
+        curve: isHead ? 0.1 : curl,
       },
       14,
     ).map((point: Point) => ({
@@ -429,7 +440,7 @@ export function flowerShapes(
           outline,
           margin,
           seed: `${seed}|inner|${i}`,
-          curve: 0.4,
+          curve: curl,
         },
         10,
       ).map((point: Point) => ({

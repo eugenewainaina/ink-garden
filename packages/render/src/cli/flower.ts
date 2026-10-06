@@ -3,7 +3,7 @@ import type { ProjectedOrgan } from '@ink-garden/engine'
 import { flowerShapes } from '../../../engine/src/dev/flower.ts'
 import { toSvg } from '../index.ts'
 import { plantPalette } from '../../../engine/src/dev/geometry.ts'
-import { setAlleleByName } from '../../../engine/test/helpers.ts'
+import { setAlleleByName, setQuantitative } from '../../../engine/test/helpers.ts'
 import { LOCI } from '../../../engine/src/loci.ts'
 
 /**
@@ -64,6 +64,17 @@ const organ: ProjectedOrgan = {
 // twice, missing `calyx` and then `seed`, and a missing key renders as
 // fill="undefined" - which is black and looks like an engine fault.
 const colours = plantPalette(phenotype, species)
+// --set trait=value forces a quantitative trait, so an extreme can actually be
+// looked at. A trait that varies by a few per cent across seedlings cannot be
+// judged by hunting for a seedling.
+for (const spec of (args['set'] ?? '').split(',').filter(Boolean)) {
+  const [trait, value] = spec.split('=')
+  if (trait === undefined || value === undefined) continue
+  const locus = LOCI.find((l) => l.kind === 'quantitative' && l.trait === trait)
+  if (locus === undefined) continue
+  genome = setQuantitative(genome, locus.id, Number(value), Number(value))
+}
+
 const stage = (args['stage'] ?? 'bloom') as 'bud' | 'bloom' | 'seed'
 
 const parts = flowerShapes(organ, phenotype, inflorescence, colours, 'inspector', stage)

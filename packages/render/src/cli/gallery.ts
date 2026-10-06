@@ -8,6 +8,8 @@ import {
   type SpeciesTemplate,
 } from '@ink-garden/engine'
 import { renderScene, toSvg } from '../index.ts'
+import { LOCI } from '../../../engine/src/loci.ts'
+import { setQuantitative } from '../../../engine/test/helpers.ts'
 
 /**
  * Render a sheet of plants.
@@ -75,7 +77,16 @@ const stage = args['stage'] ?? 'bloom'
 
 chosen.forEach((species, row) => {
   seeds.forEach((seed, col) => {
-    const genome = founderGenome(species, seed)
+    let genome = founderGenome(species, seed)
+    // --set trait=value forces a quantitative trait, so an extreme can be
+    // looked at rather than hunted for among seedlings.
+    for (const spec of (args['set'] ?? '').split(',').filter(Boolean)) {
+      const [trait, value] = spec.split('=')
+      if (trait === undefined || value === undefined) continue
+      const locus = LOCI.find((l) => l.kind === 'quantitative' && l.trait === trait)
+      if (locus === undefined) continue
+      genome = setQuantitative(genome, locus.id, Number(value), Number(value))
+    }
     const { shoot, phenotype, seed: plantSeed } = shootFor(genome, species, stage)
     const scene = sceneFromShoot(shoot, phenotype, species, plantSeed, { detail })
     const rendered = renderScene(scene, { padding: 16, precision })

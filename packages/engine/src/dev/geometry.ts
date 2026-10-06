@@ -5,7 +5,7 @@ import { DEFAULT_TILT_DEG, placeOrgans, projectOrgans } from './layout.ts'
 import { growthFormOf } from './shoot.ts'
 import { requiredRadius, taperedRadius } from './allometry.ts'
 import { flowerShapes, type FlowerColours } from './flower.ts'
-import { POINTED_TAPER, taperedStroke } from './stroke.ts'
+import { BRUSH_TAPER, POINTED_TAPER, taperedStroke } from './stroke.ts'
 import type { Shoot } from './meristem.ts'
 import type { Organ } from './structure.ts'
 
@@ -157,10 +157,16 @@ export function plantPalette(
 // Flower colour comes from the pigment loci, which already express correctly:
 // a dandelion at hue 52 is golden yellow, a jacaranda at 271 is blue-purple,
 // a rosemary at 277 is violet-blue.
+// `petal.substance` is thickness. A thin petal is more translucent than a thick
+// one of the same pigment, so it reads paler. The first attempt at this edit
+// targeted an indented copy of this block; the palette was dedented to module
+// scope when it was lifted out of the scene builder, and the change never
+// landed.
+const substance = normalisedTrait(phenotype, 'petal.substance')
 const petalFill = hsvToHex(
   phenotype.quantitative['pigment.hue'] ?? 40,
   phenotype.quantitative['pigment.saturation'] ?? 0.5,
-  phenotype.quantitative['pigment.lightness'] ?? 0.6,
+  Math.min(0.95, (phenotype.quantitative['pigment.lightness'] ?? 0.6) * (1.14 - substance * 0.26)),
 )
 const centreFill = hsvToHex(
   (phenotype.quantitative['pigment.hue'] ?? 40) - 12,
@@ -327,6 +333,14 @@ export function sceneFromShoot(
     Math.max(0.1, species.baseline.leafLightness * 0.62),
   )
   const senescenceRate = normalisedTrait(phenotype, 'senescence.rate')
+  const gloss = normalisedTrait(phenotype, 'leaf.gloss')
+  // A highlight is the paper showing through the wax rather than a colour of
+  // its own, so it is the palest thing in the palette.
+  const sheenFill = hsvToHex(
+    species.baseline.leafHue + 6,
+    Math.max(0.02, species.baseline.leafSaturation * 0.25),
+    Math.min(0.97, species.baseline.leafLightness * 1.9),
+  )
   const veinFill = hsvToHex(
     species.baseline.leafHue + 4,
     Math.max(0, species.baseline.leafSaturation * 0.6),
@@ -563,6 +577,43 @@ export function sceneFromShoot(
             stroke: lit ? shadeHex(leafEdge, shade) : leafEdge,
             strokeWidth: Math.max(0.02, drawnLength * 0.009 * lamina.scale),
           })
+        }
+
+        // `leaf.gloss` is the wax layer. A glossy leaf catches a highlight
+        // along its upper surface, which is most of what tells a holly from a
+        // fern at a glance. It has been a locus from the beginning and nothing
+        // drew it.
+        if (gloss > 0.45 && lamina.scale >= 0.12) {
+          // Sized off the lamina LENGTH. `drawnWidth` at this point is the
+          // width before the outline's own aspect narrows it, so a sheen scaled
+          // from it came out wider than the blade it lay on and washed the
+          // whole leaf pale. This is the second time that variable has been the
+          // wrong one to reach for; the blotch on a patterned petal was the
+          // first.
+          const laminaLength = drawnLength * lamina.scale
+          const sheenHalf = laminaLength * 0.022 * (gloss - 0.45) * 2
+          const sheen = taperedStroke(
+            [
+              { x: 0, y: laminaLength * 0.2 },
+              { x: laminaLength * 0.05, y: laminaLength * 0.5 },
+              { x: 0, y: laminaLength * 0.82 },
+            ],
+            BRUSH_TAPER,
+            Math.max(0.015, sheenHalf),
+          )
+          if (sheen.length >= 3) {
+            // The same transform the blade uses. The first version rotated the
+            // base offset along with the point, which swung the sheen out
+            // sideways and made it nearly as wide as the leaf.
+            const placed = sheen.map((point: Point) =>
+              place({
+                x: baseX + point.x * laminaCos + point.y * laminaSin,
+                y: baseY - point.x * laminaSin + point.y * laminaCos,
+              }),
+            )
+            for (const point of placed) include(point)
+            shapes.push({ role: 'leaf', points: placed, fill: sheenFill })
+          }
         }
 
         // Veins on blades only. A pinnule a few millimetres across has no room
