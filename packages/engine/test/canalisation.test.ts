@@ -16,6 +16,7 @@ const base = (petalCount: number, stature: number): SpeciesTemplate => ({
     petalCount,
     stature,
     leafSize: 3,
+    internodeScale: 1,
     leafAspect: 3,
     leafHue: 100,
     leafSaturation: 0.4,

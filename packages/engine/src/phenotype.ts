@@ -176,6 +176,8 @@ const SCALED_BY_BASELINE: ReadonlyArray<{
   // internode.length is deliberately NOT here: see INTERNODE_COEFFICIENT.
   { trait: 'stem.thickness', field: 'stemThickness' },
   { trait: 'leaf.length', field: 'leafSize' },
+  // internode.length is handled below: the allometric relation gives a length,
+  // and the species' packing density scales it.
   // leaf.width is NOT here. It is derived from the length and the species' own
   // proportions, because size and shape are separate axes and one baseline
   // cannot express both. See the leafAspect derivation below.
@@ -233,11 +235,14 @@ export function expressPlant(
     phenotype.quantitative['leaf.width'] = length / (aspect * variation)
   }
 
-  // The one trait that does not scale linearly with its baseline.
-  phenotype.quantitative['internode.length'] = scaleAround(
-    INTERNODE_COEFFICIENT * Math.sqrt(Math.max(0, template.baseline.stature)),
-    normalised(phenotype, 'internode.length'),
-  )
+  // Internode length: the allometric relation with stature, then the species'
+  // own packing density. A dense shrub has short internodes and therefore many
+  // of them for the same height.
+  phenotype.quantitative['internode.length'] =
+    scaleAround(
+      INTERNODE_COEFFICIENT * Math.sqrt(Math.max(0, template.baseline.stature)),
+      normalised(phenotype, 'internode.length'),
+    ) * Math.max(0.1, template.baseline.internodeScale)
 
   const canalised =
     phenotype.discrete['flower.canalisation']?.expressed[0] === 'canalised'

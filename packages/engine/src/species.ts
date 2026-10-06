@@ -59,6 +59,17 @@ export interface PhenotypeBaseline {
   readonly leafHue: number
   readonly leafSaturation: number
   readonly leafLightness: number
+  /**
+   * A species multiplier on internode length, which is leaf density.
+   *
+   * Internode length scales with stature across species, because a taller plant
+   * is mostly more internodes rather than longer ones. A species still deviates:
+   * Bean's describes rosemary as of "dense, leafy habit", and a real rosemary
+   * shoot fits its leaves at about a centimetre apart where stature alone
+   * predicts nearly three. So the allometric relation sets the starting point
+   * and the species says how tightly it packs its leaves.
+   */
+  readonly internodeScale: number
 }
 
 /**
@@ -162,10 +173,11 @@ export const ROSEMARY: SpeciesTemplate = {
     petalCount: 5,
     stature: 3,
     leafSize: 3,
-    leafAspect: 12,
-    leafHue: 90,
-    leafSaturation: 0.2,
-    leafLightness: 0.48,
+    internodeScale: 0.5,
+    leafAspect: 17,
+    leafHue: 104,
+    leafSaturation: 0.42,
+    leafLightness: 0.42,
     flowerSize: 1,
     stemThickness: 1.5,
     thermalBase: 6,
@@ -179,16 +191,16 @@ export const ROSEMARY: SpeciesTemplate = {
     'leaf.outline': [0, 0, 0, 0, 0, 1, 0, 0],
     'habit.growth_form': [1, 0],
     'leaf.venation': [1, 0, 0],
-    'phyllotaxis.pattern': [0.9, 0.1, 0, 0],
+    'phyllotaxis.pattern': [0, 1, 0, 0],
     // A bushy shrub: buds are suppressed about half the time and branches
     // leave the stem at a wide angle.
-    'branch.apical_dominance.a': [0.45, 0.55],
-    'branch.apical_dominance.b': [0.45, 0.55],
+    'branch.apical_dominance.a': [0.35, 0.65],
+    'branch.apical_dominance.b': [0.35, 0.65],
     'branch.angle.a': [0.4, 0.6],
     'branch.angle.b': [0.4, 0.6],
     'stem.pigment': [0.25, 0.75],
     'thorn.presence': [0.05, 0.95],
-    'inflorescence.type': [0.08, 0.62, 0.25, 0.05, 0, 0, 0, 0],
+    'inflorescence.type': [0, 0, 0, 0, 0, 0, 0, 1],
     'flower.symmetry': [0, 1],
     'petal.shape': [0, 0, 0.3, 0.7, 0],
     'pigment.anthocyanidin': [0.05, 0.1, 0.25, 0.6],
@@ -217,6 +229,7 @@ export const DANDELION: SpeciesTemplate = {
     petalCount: 50,
     stature: 1.5,
     leafSize: 14,
+    internodeScale: 1,
     leafAspect: 4.2,
     leafHue: 100,
     leafSaturation: 0.55,
@@ -267,6 +280,7 @@ export const SPEARMINT: SpeciesTemplate = {
     petalCount: 5,
     stature: 2,
     leafSize: 2.5,
+    internodeScale: 0.8,
     leafAspect: 2,
     leafHue: 100,
     leafSaturation: 0.48,
@@ -313,6 +327,7 @@ export const JACARANDA: SpeciesTemplate = {
     petalCount: 5,
     stature: 20,
     leafSize: 26,
+    internodeScale: 1,
     leafAspect: 2.4,
     leafHue: 92,
     leafSaturation: 0.38,
@@ -330,7 +345,7 @@ export const JACARANDA: SpeciesTemplate = {
     'leaf.outline': [1, 0, 0, 0, 0, 0, 0, 0],
     'habit.growth_form': [1, 0],
     'leaf.venation': [1, 0, 0],
-    'phyllotaxis.pattern': [0, 0.1, 0, 0.9],
+    'phyllotaxis.pattern': [0, 1, 0, 0],
     // A tree: a single trunk for metres before it forks, and branches that
     // leave at a narrower angle than a shrub's.
     'branch.apical_dominance.a': [0.1, 0.9],

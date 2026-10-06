@@ -28,6 +28,7 @@ const fixture: SpeciesTemplate = {
     petalCount: 5,
     stature: 4,
     leafSize: 3,
+    internodeScale: 1,
     leafAspect: 3,
     leafHue: 100,
     leafSaturation: 0.4,

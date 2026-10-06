@@ -69,11 +69,33 @@ export function shootGeometry(
   // internodes rather than longer ones. The first version gave a shrub six
   // nodes, which is a seedling: real rosemary carries leaves at every node of
   // every shoot and is dense with them.
-  const nodes = Math.max(6, Math.min(40, Math.round(6 + species.baseline.stature * 1.3)))
+  // A dense species packs more nodes into the same stem, so the node count
+  // rises as its internodes shorten. Otherwise packing leaves tightly would
+  // just make the plant shorter.
+  const packing = Math.max(0.1, species.baseline.internodeScale)
+  const nodes = Math.max(
+    6,
+    Math.min(34, Math.round((6 + species.baseline.stature * 1.3) / packing)),
+  )
 
   // Branch angle runs from nearly upright to nearly horizontal. The lower bound
   // is not zero: a branch at zero degrees is indistinguishable from the stem.
   const branchAngle = 12 + normalisedTrait(phenotype, 'branch.angle') * 58
+
+  // Apical dominance is mapped into a band, not used raw.
+  //
+  // Two loci of equal weight give a normalised value of 0, 0.5 or 1, and used
+  // raw those mean every bud growing (an explosion) or none (a pole). Neither
+  // is a plant. Real dominance varies within limits: a dense shrub lets most
+  // buds out, a young tree very few, and nothing reaches a mathematical
+  // extreme.
+  //
+  // The band is wide at the top on purpose. A first attempt used 0.15 to 0.90,
+  // which pulled a tree's 0.90 down to 0.83, and the jacaranda went from 2,700
+  // pieces to 14,000. A trunk that keeps nine tenths of its buds suppressed is
+  // the whole reason a tree has a trunk, so the upper end has to stay within
+  // reach.
+  const dominance = 0.08 + normalisedTrait(phenotype, 'branch.apical_dominance') * 0.9
 
   const form = growthFormOf(phenotype)
   // A rosette leaf leaves the crown rising steeply and then arches out, so
@@ -87,7 +109,7 @@ export function shootGeometry(
     internodeLength: phenotype.quantitative['internode.length'] ?? 1,
     leafLength: phenotype.quantitative['leaf.length'] ?? 1,
     leafWidth: phenotype.quantitative['leaf.width'] ?? 0.5,
-    apicalDominance: normalisedTrait(phenotype, 'branch.apical_dominance'),
+    apicalDominance: dominance,
     branchAngle,
   }
 }

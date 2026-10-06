@@ -3,6 +3,7 @@ import type { SpeciesTemplate } from '../species.ts'
 import { leafDecomposition, leafOutline, type Point } from './leaf.ts'
 import { DEFAULT_TILT_DEG, placeOrgans, projectOrgans } from './layout.ts'
 import { growthFormOf } from './shoot.ts'
+import { requiredRadius, taperedRadius } from './allometry.ts'
 import type { Shoot } from './meristem.ts'
 import type { Organ } from './structure.ts'
 
@@ -119,14 +120,23 @@ export function sceneFromShoot(
 
   const organs = projectOrgans(placeOrgans(shoot), tiltDeg)
 
-  // A stem thinner than this is invisible, so give it a floor relative to the
-  // plant rather than letting a 0.1 unit axis vanish.
   let tallest = 0
   for (const organ of organs) {
     const tip = organ.y + organ.length * organ.scale * Math.cos((organ.angle * Math.PI) / 180)
     if (tip > tallest) tallest = tip
   }
-  const STEM_FLOOR = Math.max(0.06, tallest * 0.006)
+
+  // Stem thickness comes from the pipe model: the cross-section a stem needs is
+  // set by the leaf area it serves, so radius goes as the square root of that
+  // area, and it tapers toward the tip because less leaf sits above it. This is
+  // what stops a plant being drawn as a bundle of wires regardless of how much
+  // foliage it carries.
+  const totalLeafArea = shoot.leaves.reduce(
+    (sum, leaf) => sum + leaf.length * leaf.width,
+    0,
+  )
+  const baseRadius = requiredRadius(totalLeafArea, tallest)
+  const STEM_FLOOR = Math.max(0.04, tallest * 0.004)
   for (let i = 0; i < organs.length; i += 1) {
     const organ = organs[i]
     if (organ === undefined) continue
@@ -188,8 +198,10 @@ export function sceneFromShoot(
       continue
     }
 
-    // An axial organ: a quad along its own direction, with a visible width.
-    const half = Math.max(organ.width, STEM_FLOOR) / 2
+    // An axial organ: a quad along its own direction, as thick as the pipe
+    // model says at this height, and never thinner than it can be drawn.
+    const fraction = tallest > 0 ? Math.max(0, Math.min(1, organ.y / tallest)) : 0
+    const half = Math.max(taperedRadius(baseRadius, fraction), STEM_FLOOR) / 2
     const length = organ.length * organ.scale
     const tipLocal: Point = { x: 0, y: length }
     const baseLocal: Point = { x: 0, y: 0 }

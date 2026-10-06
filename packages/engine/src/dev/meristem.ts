@@ -123,8 +123,18 @@ export interface Shoot {
   readonly branches: readonly Branch[]
 }
 
-/** Two levels of branching is already a shrub; more explodes the organ count. */
-const MAX_BRANCH_DEPTH = 2
+/**
+ * One order of branching.
+ *
+ * A young plant is a main axis with branches off it, and that is what this
+ * builds. Two orders was tried and is wrong at this scale for a reason worth
+ * recording: with twenty nodes and fifty-six percent of buds growing out, the
+ * first order gives eleven branches and the second gives ninety-four, which
+ * took a rosemary seedling to 1182 leaves. A mature shrub does carry that many,
+ * but it gets them over years, and this engine is drawing a young plant. Depth
+ * rises when growth over time arrives in M1, not before.
+ */
+const MAX_BRANCH_DEPTH = 1
 
 /**
  * Grow a shoot, and let some of its axillary buds become branches.
@@ -155,7 +165,7 @@ export function buildShoot(config: ShootConfig, depth = 0): Shoot {
         shoot: buildShoot(
           {
             ...config,
-            nodes: Math.max(2, Math.round(config.nodes * 0.6)),
+            nodes: Math.max(2, Math.round(config.nodes * 0.45)),
             apicalDominance: Math.min(1, config.apicalDominance + 0.15),
             seed: `${config.seed}|b${depth}|${node}`,
           },
