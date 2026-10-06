@@ -5,6 +5,7 @@ import { DEFAULT_TILT_DEG, placeOrgans, projectOrgans } from './layout.ts'
 import { growthFormOf } from './shoot.ts'
 import { requiredRadius, taperedRadius } from './allometry.ts'
 import { flowerShapes } from './flower.ts'
+import { POINTED_TAPER, taperedStroke } from './stroke.ts'
 import type { Shoot } from './meristem.ts'
 import type { Organ } from './structure.ts'
 
@@ -194,6 +195,13 @@ export function sceneFromShoot(
   // light and reads paler than the mesophyll around it. Drawing it darker put
   // it within a few points of a shaded leaf once the light model was added, and
   // 154 veins became invisible.
+  // The inked edge is a darker version of the blade rather than a black line,
+  // so a leaf still reads as its own colour.
+  const leafEdge = hsvToHex(
+    species.baseline.leafHue - 8,
+    Math.min(1, species.baseline.leafSaturation + 0.2),
+    Math.max(0.1, species.baseline.leafLightness * 0.62),
+  )
   const veinFill = hsvToHex(
     species.baseline.leafHue + 4,
     Math.max(0, species.baseline.leafSaturation * 0.6),
@@ -326,12 +334,30 @@ export function sceneFromShoot(
         if (local.length < 3) continue
         const points = local.map(place)
         for (const point of points) include(point)
-        shapes.push({ role: 'leaf', points, fill: lit ? shadeHex(leafFill, shade) : leafFill })
+        const blade = lit ? shadeHex(leafFill, shade) : leafFill
+        shapes.push({ role: 'leaf', points, fill: blade })
+        // A drawn leaf has a defined edge. Without one the blade is a flat
+        // silhouette, which is what made the whole plant read as a diagram: ink
+        // states where a shape stops, and a wash alone does not.
+        //
+        // Only on blades large enough to show one. A jacaranda's pinnules are a
+        // few millimetres across, and an edge on each of them doubled the tree
+        // to a hundred and twenty thousand shapes without being visible.
+        if (lamina.scale >= 0.12) {
+          shapes.push({
+            role: 'leaf',
+            points,
+            fill: 'none',
+            stroke: lit ? shadeHex(leafEdge, shade) : leafEdge,
+            strokeWidth: Math.max(0.02, drawnLength * 0.009 * lamina.scale),
+          })
+        }
 
         // Veins on blades only. A pinnule a few millimetres across has no room
         // for them, and a rachis is a line rather than a blade: drawing veins on
         // one adds tens of thousands of invisible paths to a jacaranda.
         if (lamina.scale < 0.12 || lamina.widthFactor < 0.3) continue
+        const veinBase = Math.max(0.012, drawnLength * 0.0075)
         for (const vein of leafVeins(
           {
             length: drawnLength * lamina.scale,
@@ -349,15 +375,20 @@ export function sceneFromShoot(
             y: baseY - point.x * laminaSin + point.y * laminaCos,
           }))
           if (path.length < 2) continue
-          const placed = path.map(place)
+
+          // A vein is a BRUSH MARK, not a line of constant width. It leaves the
+          // midrib at its widest and runs to a point at the margin, which is
+          // what a real vein does and also what a hand does when it loads a
+          // brush and lifts at the end of a stroke. Canvas cannot vary a
+          // stroke's width along its length, so the mark is a filled polygon.
+          const mark = taperedStroke(path, POINTED_TAPER, veinBase * vein.weight)
+          if (mark.length < 3) continue
+          const placed = mark.map(place)
           for (const point of placed) include(point)
           shapes.push({
             role: 'leaf',
             points: placed,
-            fill: 'none',
-            stroke: lit ? shadeHex(veinFill, shade) : veinFill,
-            strokeWidth: Math.max(0.015, drawnLength * 0.006 * vein.weight),
-            closed: false,
+            fill: lit ? shadeHex(veinFill, shade) : veinFill,
           })
         }
       }
