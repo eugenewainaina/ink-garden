@@ -4,7 +4,7 @@ import { leafDecomposition, leafOutline, leafVeins, type Point } from './leaf.ts
 import { DEFAULT_TILT_DEG, placeOrgans, projectOrgans } from './layout.ts'
 import { growthFormOf } from './shoot.ts'
 import { requiredRadius, taperedRadius } from './allometry.ts'
-import { flowerShapes } from './flower.ts'
+import { flowerShapes, type FlowerColours } from './flower.ts'
 import { POINTED_TAPER, taperedStroke } from './stroke.ts'
 import type { Shoot } from './meristem.ts'
 import type { Organ } from './structure.ts'
@@ -109,6 +109,78 @@ function diameterOf(points: readonly Point[]): number {
   return Number.isFinite(minX) && maxX > minX ? maxX - minX : 0
 }
 
+/**
+ * The colours a plant draws in.
+ *
+ * Lifted out of the scene builder because the flower inspector had its own
+ * hardcoded copy and it drifted TWICE: first with no `calyx` key and then with
+ * no `seed`, and a missing key renders as fill="undefined", which is black. A
+ * verification tool that lies is worse than none, so there is now one palette
+ * and both callers take it.
+ */
+export function plantPalette(
+  phenotype: Phenotype,
+  species: SpeciesTemplate,
+): FlowerColours {
+// Flower colour comes from the pigment loci, which already express correctly:
+// a dandelion at hue 52 is golden yellow, a jacaranda at 271 is blue-purple,
+// a rosemary at 277 is violet-blue.
+const petalFill = hsvToHex(
+  phenotype.quantitative['pigment.hue'] ?? 40,
+  phenotype.quantitative['pigment.saturation'] ?? 0.5,
+  phenotype.quantitative['pigment.lightness'] ?? 0.6,
+)
+const centreFill = hsvToHex(
+  (phenotype.quantitative['pigment.hue'] ?? 40) - 12,
+  Math.min(1, (phenotype.quantitative['pigment.saturation'] ?? 0.5) + 0.1),
+  Math.max(0.15, (phenotype.quantitative['pigment.lightness'] ?? 0.6) * 0.78),
+)
+const petalEdge = hsvToHex(
+  (phenotype.quantitative['pigment.hue'] ?? 40) - 20,
+  Math.min(1, (phenotype.quantitative['pigment.saturation'] ?? 0.5) + 0.2),
+  Math.max(0.2, (phenotype.quantitative['pigment.lightness'] ?? 0.6) * 0.62),
+)
+// The reproductive organs are a paler, yellower green than the foliage: a
+// filament is not a leaf, and in most flowers it is close to white.
+// Pale, but not invisible: a filament is close to white in most flowers, and
+// at 1.7 times the leaf lightness it was the same colour as the paper and
+// disappeared on every species.
+const organFill = hsvToHex(
+  species.baseline.leafHue + 8,
+  Math.max(0.08, species.baseline.leafSaturation * 0.45),
+  Math.min(0.86, species.baseline.leafLightness * 1.42),
+)
+const antherFill = hsvToHex(
+  (phenotype.quantitative['pigment.hue'] ?? 40) + 18,
+  Math.max(0.15, (phenotype.quantitative['pigment.saturation'] ?? 0.5) * 0.7),
+  Math.min(0.9, (phenotype.quantitative['pigment.lightness'] ?? 0.6) * 1.15),
+)
+// The calyx is the outermost whorl: photosynthetic in most flowers, and so
+// nearer the foliage than the corolla is. Rosemary's is described as darker
+// and purplish, which is what a shift of the flower's own hue toward the leaf
+// gives.
+// Lighter than the foliage, not darker: a calyx is thin and backlit, and at
+// 0.92 of the leaf lightness with the light model on top it came out black.
+const calyxFill = hsvToHex(
+  species.baseline.leafHue - 4,
+  Math.max(0.1, species.baseline.leafSaturation * 0.7),
+  Math.min(0.85, species.baseline.leafLightness * 1.3),
+)
+const colours = {
+  petal: petalFill,
+  centre: centreFill,
+  organ: organFill,
+  anther: antherFill,
+  calyx: calyxFill,
+  seed: hsvToHex(
+    species.baseline.leafHue - 24,
+    Math.max(0.12, species.baseline.leafSaturation * 0.5),
+    Math.min(0.62, species.baseline.leafLightness * 1.35),
+  ),
+}
+  return colours
+}
+
 export function hsvToHex(hue: number, saturation: number, value: number): string {
   const h = ((hue % 360) + 360) % 360
   const s = Math.max(0, Math.min(1, saturation))
@@ -187,57 +259,7 @@ export function sceneFromShoot(
     species.baseline.leafLightness * 0.85,
   )
 
-  // Flower colour comes from the pigment loci, which already express correctly:
-  // a dandelion at hue 52 is golden yellow, a jacaranda at 271 is blue-purple,
-  // a rosemary at 277 is violet-blue.
-  const petalFill = hsvToHex(
-    phenotype.quantitative['pigment.hue'] ?? 40,
-    phenotype.quantitative['pigment.saturation'] ?? 0.5,
-    phenotype.quantitative['pigment.lightness'] ?? 0.6,
-  )
-  const centreFill = hsvToHex(
-    (phenotype.quantitative['pigment.hue'] ?? 40) - 12,
-    Math.min(1, (phenotype.quantitative['pigment.saturation'] ?? 0.5) + 0.1),
-    Math.max(0.15, (phenotype.quantitative['pigment.lightness'] ?? 0.6) * 0.78),
-  )
-  const petalEdge = hsvToHex(
-    (phenotype.quantitative['pigment.hue'] ?? 40) - 20,
-    Math.min(1, (phenotype.quantitative['pigment.saturation'] ?? 0.5) + 0.2),
-    Math.max(0.2, (phenotype.quantitative['pigment.lightness'] ?? 0.6) * 0.62),
-  )
-  // The reproductive organs are a paler, yellower green than the foliage: a
-  // filament is not a leaf, and in most flowers it is close to white.
-  // Pale, but not invisible: a filament is close to white in most flowers, and
-  // at 1.7 times the leaf lightness it was the same colour as the paper and
-  // disappeared on every species.
-  const organFill = hsvToHex(
-    species.baseline.leafHue + 8,
-    Math.max(0.08, species.baseline.leafSaturation * 0.45),
-    Math.min(0.86, species.baseline.leafLightness * 1.42),
-  )
-  const antherFill = hsvToHex(
-    (phenotype.quantitative['pigment.hue'] ?? 40) + 18,
-    Math.max(0.15, (phenotype.quantitative['pigment.saturation'] ?? 0.5) * 0.7),
-    Math.min(0.9, (phenotype.quantitative['pigment.lightness'] ?? 0.6) * 1.15),
-  )
-  // The calyx is the outermost whorl: photosynthetic in most flowers, and so
-  // nearer the foliage than the corolla is. Rosemary's is described as darker
-  // and purplish, which is what a shift of the flower's own hue toward the leaf
-  // gives.
-  // Lighter than the foliage, not darker: a calyx is thin and backlit, and at
-  // 0.92 of the leaf lightness with the light model on top it came out black.
-  const calyxFill = hsvToHex(
-    species.baseline.leafHue - 4,
-    Math.max(0.1, species.baseline.leafSaturation * 0.7),
-    Math.min(0.85, species.baseline.leafLightness * 1.3),
-  )
-  const colours = {
-    petal: petalFill,
-    centre: centreFill,
-    organ: organFill,
-    anther: antherFill,
-    calyx: calyxFill,
-  }
+
   const outline = phenotype.discrete['leaf.outline']?.expressed[0] ?? 'elliptic'
   const margin = phenotype.discrete['leaf.margin']?.expressed[0] ?? 'entire'
   const leafForm = phenotype.discrete['leaf.form']?.expressed[0] ?? 'simple'
@@ -313,6 +335,15 @@ export function sceneFromShoot(
     if (organ.depth < minDepth) minDepth = organ.depth
     if (organ.depth > maxDepth) maxDepth = organ.depth
   }
+  const colours = plantPalette(phenotype, species)
+  // A faint edge on every petal. Not part of the palette: it is an outline, and
+  // a white corolla on pale paper is invisible without one.
+  const petalEdge = hsvToHex(
+    (phenotype.quantitative['pigment.hue'] ?? 40) - 20,
+    Math.min(1, (phenotype.quantitative['pigment.saturation'] ?? 0.5) + 0.2),
+    Math.max(0.2, (phenotype.quantitative['pigment.lightness'] ?? 0.6) * 0.62),
+  )
+
   const depthRange = {
     min: Number.isFinite(minDepth) ? minDepth : 0,
     max: Number.isFinite(maxDepth) ? maxDepth : 0,
@@ -341,7 +372,11 @@ export function sceneFromShoot(
         inflorescence,
         colours,
         `${seed}|${i}`,
-        shoot.flowerStage === 'bud' ? 'bud' : 'bloom',
+        shoot.flowerStage === 'bud'
+          ? 'bud'
+          : shoot.flowerStage === 'seed'
+            ? 'seed'
+            : 'bloom',
       )) {
         for (const point of part.points) include(point)
         shapes.push({

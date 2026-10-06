@@ -3,6 +3,7 @@ import {
   furthestPhenology,
   phenologyAt,
   phenologyOver,
+  STAGE_ORDER,
   stageRank,
 } from '../../src/dev/phenology.ts'
 import type { ThermalState } from '../../src/dev/thermal.ts'
@@ -76,7 +77,9 @@ describe('phenologyAt', () => {
   })
 
   it('never moves backwards as warmth accumulates', () => {
-    const order = ['germination', 'juvenile', 'vegetative', 'bud', 'bloom']
+    // The engine's own order, not a copy. A hand-written list here is exactly
+    // how this test failed with a -1 the moment `seed` joined the year.
+    const order = STAGE_ORDER
     const p = phenotype()
     let previous = -1
     for (let gdd = 0; gdd <= 4000; gdd += 25) {
@@ -106,7 +109,9 @@ describe('phenologyAt', () => {
       blended: false,
       secondaryWeight: 0,
     }
-    expect(phenologyAt(state(5000), longDay, ROSEMARY, LONG_DAY).stage).toBe('bloom')
+    expect(
+      stageRank(phenologyAt(state(5000), longDay, ROSEMARY, LONG_DAY).stage),
+    ).toBeGreaterThanOrEqual(stageRank('bloom'))
   })
 
   it('holds a short-day plant in long days', () => {
@@ -118,7 +123,9 @@ describe('phenologyAt', () => {
       secondaryWeight: 0,
     }
     expect(phenologyAt(state(5000), shortDay, ROSEMARY, LONG_DAY).stage).toBe('bud')
-    expect(phenologyAt(state(5000), shortDay, ROSEMARY, SHORT_DAY).stage).toBe('bloom')
+    expect(
+      stageRank(phenologyAt(state(5000), shortDay, ROSEMARY, SHORT_DAY).stage),
+    ).toBeGreaterThanOrEqual(stageRank('bloom'))
   })
 
   it('holds at bud until vernalisation is satisfied', () => {
@@ -132,9 +139,9 @@ describe('phenologyAt', () => {
     expect(phenologyAt(state(5000, 10), needsChill, ROSEMARY, NEUTRAL_DAY).stage).toBe(
       'bud',
     )
-    expect(phenologyAt(state(5000, 200), needsChill, ROSEMARY, NEUTRAL_DAY).stage).toBe(
-      'bloom',
-    )
+    expect(
+      stageRank(phenologyAt(state(5000, 200), needsChill, ROSEMARY, NEUTRAL_DAY).stage),
+    ).toBeGreaterThanOrEqual(stageRank('bloom'))
   })
 
   it('scales the budget with the species, not a fixed number', () => {
@@ -142,7 +149,9 @@ describe('phenologyAt', () => {
       ...ROSEMARY,
       baseline: { ...ROSEMARY.baseline, thermalConstant: 200 },
     }
-    expect(phenologyAt(state(300), phenotype(), quick, NEUTRAL_DAY).stage).toBe('bloom')
+    expect(
+      stageRank(phenologyAt(state(300), phenotype(), quick, NEUTRAL_DAY).stage),
+    ).toBeGreaterThanOrEqual(stageRank('bloom'))
   })
 
   it('treats a zero budget as instantly mature rather than dividing by zero', () => {
@@ -151,7 +160,7 @@ describe('phenologyAt', () => {
       baseline: { ...ROSEMARY.baseline, thermalConstant: 0 },
     }
     const result = phenologyAt(state(0), phenotype(), instant, NEUTRAL_DAY)
-    expect(result.stage).toBe('bloom')
+    expect(stageRank(result.stage)).toBeGreaterThanOrEqual(stageRank('bloom'))
     expect(Number.isFinite(result.progress)).toBe(true)
   })
 
@@ -200,7 +209,9 @@ describe('latching and the day-by-day driver', () => {
   it('blooms a dandelion within months in the tropics', () => {
     const p = phenotype({ 'thermal.constant': DANDELION.baseline.thermalConstant })
     const series = weatherSeries(180, -1.29, 100, 1795)
-    expect(phenologyOver(series, p, DANDELION, -1.29).stage).toBe('bloom')
+    expect(stageRank(phenologyOver(series, p, DANDELION, -1.29).stage)).toBeGreaterThanOrEqual(
+      stageRank('bloom'),
+    )
   })
 
   it('does not bloom a dandelion in a Glasgow winter', () => {

@@ -129,7 +129,7 @@ export interface Branch {
 }
 
 /** What a shoot's flowers are doing, from the phenology. */
-export type FlowerStage = 'none' | 'bud' | 'bloom'
+export type FlowerStage = 'none' | 'bud' | 'bloom' | 'seed'
 
 export interface Shoot {
   readonly internodes: readonly Organ[]

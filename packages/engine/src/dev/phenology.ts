@@ -44,6 +44,16 @@ const STAGE_STARTS: ReadonlyArray<readonly [Stage, number]> = [
   ['vegetative', 0.15],
   ['bud', 0.75],
   ['bloom', 0.95],
+  // `seed` and `senescence` were in the Stage union from the beginning and
+  // never reachable, because M0b stopped at bloom. A dandelion's clock is the
+  // stage it is most recognised by after the flower, so the year now runs on to
+  // seed before the plant senesces.
+  //
+  // `senescence` is deliberately NOT here. It is in the union, but a plant that
+  // visibly dies back touches spec section 2's promise that nothing is ever
+  // lost, and whether a perennial should die down for winter is a product
+  // decision rather than a botanical one. Seed is safe: a clock is not a loss.
+  ['seed', 1.35],
 ]
 
 const winner = (p: Phenotype, id: string): string => p.discrete[id]?.expressed[0] ?? ''
@@ -79,7 +89,11 @@ export function phenologyAt(
     end = STAGE_STARTS[i + 1]?.[1] ?? entry[1] + 0.2
   }
 
-  if (stage === 'bloom') {
+  // The gate applies to everything from bloom onwards, not just to bloom. A
+  // plant that cannot open its flowers because the day is the wrong length
+  // cannot set seed either, and gating only `bloom` let a short-day plant in
+  // long days run straight through to a seed head it could not have made.
+  if (stage === 'bloom' || stage === 'seed') {
     const response = winner(phenotype, 'photoperiod.response')
     const critical = trait(phenotype, 'photoperiod.critical')
     const dayOk =

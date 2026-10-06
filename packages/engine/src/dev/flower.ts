@@ -46,6 +46,8 @@ export interface FlowerColours {
   readonly anther: string
   /** The calyx, behind the corolla. Green, or a darker shade of the flower. */
   readonly calyx: string
+  /** A ripe achene body: cream to greenish brown. */
+  readonly seed: string
 }
 
 /**
@@ -63,7 +65,7 @@ export function flowerShapes(
   inflorescence: string,
   colours: FlowerColours,
   seed: string,
-  stage: 'bud' | 'bloom' = 'bloom',
+  stage: 'bud' | 'bloom' | 'seed' = 'bloom',
 ): readonly { readonly points: readonly Point[]; readonly fill: string }[] {
   const petals = Math.max(1, Math.round(phenotype.quantitative['petal.count'] ?? 5))
   const shapeTerm = phenotype.discrete['petal.shape']?.expressed[0] ?? 'rounded'
@@ -136,6 +138,72 @@ export function flowerShapes(
   // is exactly what the first flower close-up showed.
   const drawn = Math.max(1, Math.min(isHead ? 96 : 12, petals))
   const phase = (seed.length * 37) % 360
+
+  // ---- The seed head ----
+  //
+  // The Flora of New Zealand gives a dandelion's achene body as clavate and 2.5
+  // to 3.5 mm, its cone half a millimetre, its beak a slender white 7 to 10 mm,
+  // and its pappus a white 5 to 7 mm. So a seed runs to about 15 to 21 mm from
+  // base to pappus tip, which is very nearly the radius of the capitulum it
+  // replaces: the clock is the same size as the flower was.
+  //
+  // Drawn as a globe of achenes, because that is what it is. Each one is a body,
+  // a long beak, and a parachute.
+  if (stage === 'seed') {
+    const seeds = Math.max(8, Math.min(48, Math.round(petals * 0.7)))
+    const phase1 = phase + 180 / seeds
+    for (let i = 0; i < seeds; i += 1) {
+      const angle = phase1 + (i * 360) / seeds
+      const radians = (angle * Math.PI) / 180
+      const outward = { x: Math.sin(radians), y: Math.cos(radians) }
+      const at = (fraction: number): Point => ({
+        x: centre.x + outward.x * petalLength * fraction,
+        y: centre.y + outward.y * petalLength * fraction,
+      })
+
+      // The achene body, clavate: narrow at the base, broadening upward.
+      const bodyBase = at(0.1)
+      const bodyTop = at(0.28)
+      const body = leafOutline(
+        {
+          length: petalLength * 0.2,
+          width: Math.max(0.02, petalLength * 0.07),
+          outline: 'spatulate',
+          margin: 'entire',
+          seed: `${seed}|achene|${i}`,
+          curve: 0,
+        },
+        7,
+      ).map((point: Point) => ({
+        x: bodyBase.x + point.x * Math.cos(radians) + point.y * outward.x,
+        y: bodyBase.y - point.x * Math.sin(radians) + point.y * outward.y,
+      }))
+      if (body.length >= 3) out.push({ points: body, fill: colours.seed })
+
+      // The beak, slender and long: seven to ten millimetres against a body of
+      // three, which is why it reads as a stalk rather than as part of the seed.
+      const beak = taperedStroke(
+        [bodyTop, at(0.5), at(0.72)],
+        POINTED_TAPER,
+        Math.max(0.008, petalLength * 0.018),
+      )
+      if (beak.length >= 3) out.push({ points: beak, fill: colours.organ })
+
+      // The pappus: a parachute of hairs, which is what carries the seed.
+      const hairs = 7
+      for (let h = 0; h < hairs; h += 1) {
+        const spread = (h / (hairs - 1) - 0.5) * 0.9
+        const from = at(0.72)
+        const tip = {
+          x: centre.x + outward.x * petalLength + Math.cos(radians) * spread * petalLength * 0.34,
+          y: centre.y + outward.y * petalLength - Math.sin(radians) * spread * petalLength * 0.34,
+        }
+        const hair = taperedStroke([from, tip], POINTED_TAPER, Math.max(0.006, petalLength * 0.012))
+        if (hair.length >= 3) out.push({ points: hair, fill: colours.organ })
+      }
+    }
+    return out
+  }
 
   // ---- The calyx, behind everything ----
   //

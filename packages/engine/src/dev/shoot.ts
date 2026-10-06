@@ -148,7 +148,13 @@ export function shootGeometry(
   // buds at most, and before `bud` it has nothing: a vegetative plant is
   // leaves and stem, which is what most of its year looks like.
   const flowerStage: FlowerStage =
-    stage === 'bloom' ? 'bloom' : stage === 'bud' ? 'bud' : 'none'
+    stage === 'seed' || stage === 'senescence'
+      ? 'seed'
+      : stage === 'bloom'
+        ? 'bloom'
+        : stage === 'bud'
+          ? 'bud'
+          : 'none'
   // A head is sized by the capitulum; a simple flower by its corolla. Both come
   // from the species through the same baseline field, which is what lets a
   // dandelion's 3 to 5 cm head and a mint's 2.5 mm corolla be the same code.
