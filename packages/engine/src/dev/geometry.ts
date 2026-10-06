@@ -1,6 +1,6 @@
 import type { Phenotype } from '../phenotype.ts'
 import type { SpeciesTemplate } from '../species.ts'
-import { leafDecomposition, leafOutline, type Point } from './leaf.ts'
+import { leafDecomposition, leafOutline, leafVeins, type Point } from './leaf.ts'
 import { DEFAULT_TILT_DEG, placeOrgans, projectOrgans } from './layout.ts'
 import { growthFormOf } from './shoot.ts'
 import { requiredRadius, taperedRadius } from './allometry.ts'
@@ -30,6 +30,13 @@ export interface SceneShape {
    */
   readonly stroke?: string
   readonly strokeWidth?: number
+  /**
+   * Whether the polygon closes.
+   *
+   * Veins are open paths: closing them would draw a line back along the vein to
+   * where it started, which on a secondary vein is a visible spur.
+   */
+  readonly closed?: boolean
 }
 
 export interface Scene {
@@ -50,6 +57,47 @@ export interface Scene {
 /**
  * Roughly the width of a polygon, used to scale an outline with its size.
  */
+/**
+ * How much light reaches an organ.
+ *
+ * Beer-Lambert extinction through a canopy: light falls off with the leaf area
+ * between it and the sun, and the extinction coefficient for a real canopy is
+ * typically 0.3 to 0.7. This uses the two things the model has that stand in for
+ * that path length, depth toward the viewer and height within the plant, so a
+ * leaf buried behind and below others is darker than one at the top and front.
+ *
+ * It is a light model rather than decoration, which is why it is bounded: the
+ * darkest a leaf can get is a fixed fraction of the species' own colour, so the
+ * plant never stops being recognisably that plant's green.
+ */
+const MIN_SHADE = 0.7
+
+function shadeAt(
+  organ: { readonly y: number },
+  depth: number,
+  depthRange: { readonly min: number; readonly max: number },
+  tallest: number,
+): number {
+  const span = Math.max(1e-6, depthRange.max - depthRange.min)
+  const towards = (depth - depthRange.min) / span
+  const height = tallest > 0 ? Math.max(0, Math.min(1, organ.y / tallest)) : 0
+  const lit = 0.55 + 0.45 * towards
+  const above = 0.7 + 0.3 * height
+  return Math.max(MIN_SHADE, Math.min(1, lit * above))
+}
+
+/** Darken a hex fill by a factor, keeping its hue and its ratio. */
+function shadeHex(hex: string, factor: number): string {
+  const match = /^#([0-9a-f]{6})$/i.exec(hex)
+  if (match?.[1] === undefined) return hex
+  const value = Number.parseInt(match[1], 16)
+  const channel = (shift: number): string =>
+    Math.max(0, Math.min(255, Math.round(((value >> shift) & 0xff) * factor)))
+      .toString(16)
+      .padStart(2, '0')
+  return `#${channel(16)}${channel(8)}${channel(0)}`
+}
+
 function diameterOf(points: readonly Point[]): number {
   let minX = Number.POSITIVE_INFINITY
   let maxX = Number.NEGATIVE_INFINITY
@@ -140,6 +188,17 @@ export function sceneFromShoot(
   const leafForm = phenotype.discrete['leaf.form']?.expressed[0] ?? 'simple'
   const inflorescence = phenotype.discrete['inflorescence.type']?.expressed[0] ?? 'solitary'
   const laminae = leafDecomposition(leafForm)
+  const venation = phenotype.discrete['leaf.venation']?.expressed[0] ?? 'pinnate'
+  // A vein is a LIGHTER line on the blade. That is not a stylistic choice: a
+  // vein is raised and its bundle sheath is often unpigmented, so it catches
+  // light and reads paler than the mesophyll around it. Drawing it darker put
+  // it within a few points of a shaded leaf once the light model was added, and
+  // 154 veins became invisible.
+  const veinFill = hsvToHex(
+    species.baseline.leafHue + 4,
+    Math.max(0, species.baseline.leafSaturation * 0.6),
+    Math.min(0.85, species.baseline.leafLightness * 1.5),
+  )
 
   // How much the midrib turns across the blade, in radians. A real lamina is
   // not a straight line, and curvature is what decides how much of the blade a
@@ -180,6 +239,19 @@ export function sceneFromShoot(
     0,
   )
   const baseRadius = requiredRadius(totalLeafArea, tallest)
+
+  // The depth range, for the light model. Taken before drawing so every organ
+  // is shaded against the same span rather than against whatever came before it.
+  let minDepth = Number.POSITIVE_INFINITY
+  let maxDepth = Number.NEGATIVE_INFINITY
+  for (const organ of organs) {
+    if (organ.depth < minDepth) minDepth = organ.depth
+    if (organ.depth > maxDepth) maxDepth = organ.depth
+  }
+  const depthRange = {
+    min: Number.isFinite(minDepth) ? minDepth : 0,
+    max: Number.isFinite(maxDepth) ? maxDepth : 0,
+  }
   const STEM_FLOOR = Math.max(0.04, tallest * 0.004)
   for (let i = 0; i < organs.length; i += 1) {
     const organ = organs[i]
@@ -194,13 +266,16 @@ export function sceneFromShoot(
       y: organ.y - local.x * sin + local.y * cos,
     })
 
+    const shade = shadeAt(organ, organ.depth, depthRange, tallest)
+    const lit = shade < 0.999
+
     if (organ.kind === 'flower') {
       for (const part of flowerShapes(organ, phenotype, inflorescence, colours, `${seed}|${i}`)) {
         for (const point of part.points) include(point)
         shapes.push({
           role: 'flower',
           points: part.points,
-          fill: part.fill,
+          fill: lit ? shadeHex(part.fill, shade) : part.fill,
           stroke: petalEdge,
           strokeWidth: Math.max(0.02, diameterOf(part.points) * 0.012),
         })
@@ -251,7 +326,40 @@ export function sceneFromShoot(
         if (local.length < 3) continue
         const points = local.map(place)
         for (const point of points) include(point)
-        shapes.push({ role: 'leaf', points, fill: leafFill })
+        shapes.push({ role: 'leaf', points, fill: lit ? shadeHex(leafFill, shade) : leafFill })
+
+        // Veins on blades only. A pinnule a few millimetres across has no room
+        // for them, and a rachis is a line rather than a blade: drawing veins on
+        // one adds tens of thousands of invisible paths to a jacaranda.
+        if (lamina.scale < 0.12 || lamina.widthFactor < 0.3) continue
+        for (const vein of leafVeins(
+          {
+            length: drawnLength * lamina.scale,
+            width: Math.max(drawnWidth * lamina.scale * lamina.widthFactor, 0.02),
+            outline,
+            margin,
+            venation,
+            seed: `${seed}|leaf|${i}|${k}`,
+            curve: arch,
+          },
+          lamina.scale >= 1 ? 26 : 12,
+        )) {
+          const path = vein.points.map((point: Point) => ({
+            x: baseX + point.x * laminaCos + point.y * laminaSin,
+            y: baseY - point.x * laminaSin + point.y * laminaCos,
+          }))
+          if (path.length < 2) continue
+          const placed = path.map(place)
+          for (const point of placed) include(point)
+          shapes.push({
+            role: 'leaf',
+            points: placed,
+            fill: 'none',
+            stroke: lit ? shadeHex(veinFill, shade) : veinFill,
+            strokeWidth: Math.max(0.015, drawnLength * 0.006 * vein.weight),
+            closed: false,
+          })
+        }
       }
       continue
     }
@@ -271,7 +379,11 @@ export function sceneFromShoot(
       { x: baseLocal.x - offsetLocal.x, y: baseLocal.y - offsetLocal.y },
     ].map(place)
     for (const point of quad) include(point)
-    shapes.push({ role: organ.kind, points: quad, fill: stemFill })
+    shapes.push({
+      role: organ.kind,
+      points: quad,
+      fill: lit ? shadeHex(stemFill, shade) : stemFill,
+    })
   }
 
   return { shapes, minX, minY, maxX, maxY }

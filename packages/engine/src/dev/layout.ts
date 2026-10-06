@@ -44,6 +44,8 @@ export interface ProjectedOrgan {
   readonly kind: Organ['kind']
   readonly x: number
   readonly y: number
+  /** Depth toward the viewer, kept so a light model can shade by it. */
+  readonly depth: number
   /** In-plane angle from vertical, anticlockwise, degrees. */
   readonly angle: number
   /** Foreshortening: how much of the organ's length survives the projection. */
@@ -86,6 +88,7 @@ export function projectOrgans(
       kind: organ.kind,
       x: point.x,
       y: point.y,
+      depth: organ.position.z,
       angle,
       scale,
       length: organ.length,

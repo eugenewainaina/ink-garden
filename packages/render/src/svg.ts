@@ -24,7 +24,9 @@ function pathFor(shape: SceneShape, toX: (x: number) => number, toY: (y: number)
     if (point === undefined) continue
     parts.push(`${i === 0 ? 'M' : 'L'}${toX(point.x).toFixed(2)},${toY(point.y).toFixed(2)}`)
   }
-  return `${parts.join(' ')} Z`
+  // An open path, like a vein, must not be closed.
+  const close = shape.closed === false ? '' : ' Z'
+  return `${parts.join(' ')}${close}`
 }
 
 /** The drawing without any wrapper, plus the size it wants. */
@@ -55,7 +57,7 @@ export function renderScene(scene: Scene, options: SvgOptions = {}): Rendered {
       const edge =
         shape.stroke === undefined
           ? ''
-          : ` stroke="${shape.stroke}" stroke-width="${(shape.strokeWidth ?? 0.05) * zoom}" stroke-linejoin="round"`
+          : ` stroke="${shape.stroke}" stroke-width="${(shape.strokeWidth ?? 0.05) * zoom}" stroke-linejoin="round" stroke-linecap="round"`
       return `<path d="${pathFor(shape, toX, toY)}" fill="${shape.fill}"${edge}/>`
     })
     .join('\n')

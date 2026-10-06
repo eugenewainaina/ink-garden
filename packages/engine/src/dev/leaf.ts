@@ -215,6 +215,7 @@ export interface LeafGeometry {
   readonly width: number
   readonly outline: string
   readonly margin: string
+  readonly venation?: string
   readonly seed: string
   /**
    * Total turn of the midrib across the blade, in radians, positive arching
@@ -243,16 +244,17 @@ function shapeFor(outline: string): LeafShape {
  * Walks up one side sampling profile and margin together, then back down the
  * other, so the two sides mirror exactly and the polygon closes on itself.
  */
-export function leafOutline(leaf: LeafGeometry, samples = 40): readonly Point[] {
-  const shape = shapeFor(leaf.outline)
-  const halfWidth = (leaf.width / 2) * shape.aspect
-  const steps = Math.max(8, Math.floor(samples))
+/**
+ * The midrib, walked as an arc, with the tangent at each step.
+ *
+ * Shared by the outline and the veins so a vein cannot drift off the blade it
+ * belongs to: both are laid against the same spine.
+ */
+function laminaFrame(
+  leaf: LeafGeometry,
+  steps: number,
+): { readonly midrib: readonly Point[]; readonly tangents: readonly number[] } {
   const curve = leaf.curve ?? 0
-
-  // Walk the midrib as an arc: the tangent turns steadily from the base to the
-  // apex. Each step advances by arc length and the lamina is laid perpendicular
-  // to the local tangent, so the blade follows the curve instead of pivoting
-  // about its base.
   const midrib: Point[] = [{ x: 0, y: 0 }]
   const tangents: number[] = []
   const stepLength = leaf.length / steps
@@ -267,6 +269,14 @@ export function leafOutline(leaf: LeafGeometry, samples = 40): readonly Point[] 
     tangents.push(heading)
   }
   tangents.push(heading)
+  return { midrib, tangents }
+}
+
+export function leafOutline(leaf: LeafGeometry, samples = 40): readonly Point[] {
+  const shape = shapeFor(leaf.outline)
+  const halfWidth = (leaf.width / 2) * shape.aspect
+  const steps = Math.max(8, Math.floor(samples))
+  const { midrib, tangents } = laminaFrame(leaf, steps)
 
   const side = (sign: number): Point[] => {
     const points: Point[] = []
@@ -398,4 +408,110 @@ export function leafDecomposition(
   })
 
   return placements
+}
+
+/**
+ * The veins of a blade, as thin paths in the leaf's own coordinates.
+ *
+ * Venation is how a leaf is plumbed: water arrives along the midrib and leaves
+ * along secondaries that reach toward the margin, and the pattern is one of the
+ * most reliable ways to tell a dicot from a monocot. `leaf.venation` has been a
+ * locus since the beginning and nothing drew it, which is why every leaf so far
+ * has read as a flat shape rather than a leaf.
+ */
+export interface VeinPath {
+  readonly points: readonly Point[]
+  /** Relative thickness: the midrib is the trunk, secondaries are thinner. */
+  readonly weight: number
+}
+
+export function leafVeins(
+  leaf: LeafGeometry,
+  samples = 28,
+): readonly VeinPath[] {
+  const shape = shapeFor(leaf.outline)
+  const halfWidth = (leaf.width / 2) * shape.aspect
+  const steps = Math.max(8, Math.floor(samples))
+  const { midrib, tangents } = laminaFrame(leaf, steps)
+  const at = (t: number): { centre: Point; heading: number; half: number } => {
+    const i = Math.round(t * steps)
+    const centre = midrib[i] ?? { x: 0, y: 0 }
+    const heading = tangents[i] ?? 0
+    // The blade's own half-width there, so a vein stops inside the margin
+    // instead of poking through it.
+    const w =
+      halfWidth *
+      laminaProfile(t, shape) *
+      marginFactor(t, leaf.margin, leaf.seed)
+    return { centre, heading, half: Math.max(0, w) }
+  }
+
+  const venation = leaf.venation ?? 'pinnate'
+  const out: VeinPath[] = []
+
+  // The midrib is always there: it is the vein the blade is built around.
+  out.push({ points: midrib, weight: 1 })
+
+  if (venation === 'parallel') {
+    // Monocot veins run the length of the blade and converge at both ends.
+    for (const fraction of [-0.72, -0.42, 0.42, 0.72]) {
+      const points: Point[] = []
+      for (let i = 0; i <= steps; i += 1) {
+        const t = i / steps
+        const { centre, heading, half } = at(t)
+        const offset = half * fraction
+        points.push({
+          x: centre.x + offset * Math.cos(heading),
+          y: centre.y - offset * Math.sin(heading),
+        })
+      }
+      out.push({ points, weight: 0.6 })
+    }
+    return out
+  }
+
+  if (venation === 'palmate') {
+    // Several primaries radiate from a single point at the base.
+    const from = at(0.06)
+    for (const target of [0.3, 0.5, 0.7, 0.9]) {
+      const points: Point[] = [from.centre]
+      for (let i = 1; i <= 6; i += 1) {
+        const t = 0.06 + (i / 6) * 0.7
+        const { centre, heading, half } = at(t)
+        // Sweep from the midrib out toward the margin along the way.
+        const offset = half * ((target - 0.5) * 2) * (i / 6)
+        points.push({
+          x: centre.x + offset * Math.cos(heading),
+          y: centre.y - offset * Math.sin(heading),
+        })
+      }
+      out.push({ points, weight: 0.7 })
+    }
+    return out
+  }
+
+  // Pinnate: paired secondaries off the midrib, angled toward the apex.
+  const pairs = 5
+  for (let p = 0; p < pairs; p += 1) {
+    const t = 0.16 + (p / pairs) * 0.62
+    const { centre, heading, half } = at(t)
+    if (half <= 0.01) continue
+    for (const side of [-1, 1]) {
+      const points: Point[] = [centre]
+      for (let i = 1; i <= 4; i += 1) {
+        const along = t + 0.09 * i
+        const grip = i / 4
+        const { centre: c2, heading: h2, half: half2 } = at(along)
+        // Reach most of the way to the margin, staying inside it.
+        const offset = side * Math.min(half2 * 0.85, half * grip * 0.9)
+        points.push({
+          x: c2.x + offset * Math.cos(h2),
+          y: c2.y - offset * Math.sin(h2),
+        })
+      }
+      out.push({ points, weight: 0.55 })
+    }
+  }
+
+  return out
 }
