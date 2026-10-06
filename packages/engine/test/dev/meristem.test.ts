@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { makeOrgan } from '../../src/dev/structure.ts'
 import { buildShoot, growPhytomers, shouldBranch } from '../../src/dev/meristem.ts'
 import { grow } from '../../src/dev/grow.ts'
+import { placeOrgans, projectOrgans } from '../../src/dev/layout.ts'
 import { DANDELION } from '../../src/species.ts'
 import type { PhytomerConfig, Shoot, ShootConfig } from '../../src/dev/meristem.ts'
 
@@ -284,11 +285,31 @@ describe('grow dispatches on growth form', () => {
     expect(shoot.leaves.length).toBeGreaterThan(4)
   })
 
-  it('fans rosette leaves out flatter than an erect shoot does', () => {
-    const steepest = (shoot: Shoot): number =>
-      Math.max(...shoot.leaves.map((leaf) => Math.abs(leaf.transform.angle)))
-    expect(steepest(grow(rosette, DANDELION, 'form'))).toBeGreaterThan(
-      steepest(grow(erect, DANDELION, 'form')),
+  it('makes a rosette low and wide and an erect shoot tall and narrow', () => {
+    // The botanical claim, measured on the plant rather than on a leaf angle.
+    // A rosette's leaves leave the crown steeply and then ARCH outward, so the
+    // base angle is not what makes it flat; the spread is.
+    const shape = (phenotype: typeof erect): { width: number; height: number } => {
+      const organs = projectOrgans(placeOrgans(grow(phenotype, DANDELION, 'form')), 0)
+      let minX = 0
+      let maxX = 0
+      let maxY = 0
+      for (const organ of organs) {
+        const radians = (organ.angle * Math.PI) / 180
+        const drawn = organ.length * organ.scale
+        const tipX = organ.x + drawn * Math.sin(radians)
+        const tipY = organ.y + drawn * Math.cos(radians)
+        minX = Math.min(minX, tipX)
+        maxX = Math.max(maxX, tipX)
+        maxY = Math.max(maxY, tipY)
+      }
+      return { width: maxX - minX, height: maxY }
+    }
+
+    const rosetteShape = shape(rosette)
+    const erectShape = shape(erect)
+    expect(rosetteShape.width / rosetteShape.height).toBeGreaterThan(
+      erectShape.width / erectShape.height,
     )
   })
 

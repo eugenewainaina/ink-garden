@@ -48,6 +48,17 @@ export interface PhenotypeBaseline {
    * cm long against 1 to 10 cm wide, a ratio of three to six.
    */
   readonly leafAspect: number
+  /**
+   * Leaf colour, as HSV. A species trait, not a fixed green.
+   *
+   * Real foliage varies far more than hue alone: rosemary reads grey because
+   * dense hairs and a wax layer scatter light, which is low saturation and
+   * middling lightness rather than a different green. Drawing every species the
+   * same flat green was the most obviously fake thing about the first pictures.
+   */
+  readonly leafHue: number
+  readonly leafSaturation: number
+  readonly leafLightness: number
 }
 
 /**
@@ -152,6 +163,9 @@ export const ROSEMARY: SpeciesTemplate = {
     stature: 3,
     leafSize: 3,
     leafAspect: 12,
+    leafHue: 90,
+    leafSaturation: 0.2,
+    leafLightness: 0.48,
     flowerSize: 1,
     stemThickness: 1.5,
     thermalBase: 6,
@@ -204,6 +218,9 @@ export const DANDELION: SpeciesTemplate = {
     stature: 1.5,
     leafSize: 14,
     leafAspect: 4.2,
+    leafHue: 100,
+    leafSaturation: 0.55,
+    leafLightness: 0.42,
     flowerSize: 2.5,
     stemThickness: 0.4,
     thermalBase: 4,
@@ -251,6 +268,9 @@ export const SPEARMINT: SpeciesTemplate = {
     stature: 2,
     leafSize: 2.5,
     leafAspect: 2,
+    leafHue: 100,
+    leafSaturation: 0.48,
+    leafLightness: 0.54,
     flowerSize: 0.5,
     stemThickness: 0.4,
     thermalBase: 5,
@@ -294,6 +314,9 @@ export const JACARANDA: SpeciesTemplate = {
     stature: 20,
     leafSize: 26,
     leafAspect: 2.4,
+    leafHue: 92,
+    leafSaturation: 0.38,
+    leafLightness: 0.66,
     flowerSize: 3,
     stemThickness: 8,
     thermalBase: 10,

@@ -58,7 +58,7 @@ chosen.forEach((species, row) => {
   seeds.forEach((seed, col) => {
     const genome = founderGenome(species, seed)
     const { shoot, phenotype, seed: plantSeed } = shootFor(genome, species)
-    const scene = sceneFromShoot(shoot, phenotype, plantSeed)
+    const scene = sceneFromShoot(shoot, phenotype, species, plantSeed)
     const rendered = renderScene(scene, { padding: 16 })
 
     const cellX = PAD + col * CELL_W
@@ -97,7 +97,7 @@ process.stdout.write(`wrote ${out}: ${chosen.length} species x ${seedCount} seed
 for (const species of chosen) {
   const genome = founderGenome(species, seeds[0] ?? 'x')
   const { shoot, phenotype, seed: plantSeed } = shootFor(genome, species)
-  const scene = sceneFromShoot(shoot, phenotype, plantSeed)
+  const scene = sceneFromShoot(shoot, phenotype, species, plantSeed)
   const structure = develop({ genome, species })
   process.stdout.write(
     `  ${species.id.padEnd(11)} habit ${(phenotype.discrete['habit.growth_form']?.expressed[0] ?? '?').padEnd(8)}` +

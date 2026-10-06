@@ -1,4 +1,5 @@
 import type { Phenotype } from '../phenotype.ts'
+import type { SpeciesTemplate } from '../species.ts'
 import { leafDecomposition, leafOutline, type Point } from './leaf.ts'
 import { DEFAULT_TILT_DEG, placeOrgans, projectOrgans } from './layout.ts'
 import { growthFormOf } from './shoot.ts'
@@ -29,14 +30,35 @@ export interface Scene {
 }
 
 /**
- * Flat colours for now.
+ * Convert HSV to a CSS hex colour.
  *
- * Deliberately not wired to the pigment loci yet. The point of this stage is to
- * find out whether the SHAPE reads as a dandelion, and a wrong shape cannot be
- * rescued by the right green. Colour comes after the shape is trustworthy.
+ * Leaf colour is declared by the species as HSV because that is how foliage
+ * varies: rosemary reads grey from hairs and wax, which is low SATURATION at
+ * the same hue, not a different green.
  */
-const LEAF_FILL = '#5f8a4a'
-const STEM_FILL = '#6d5c40'
+function hsvToHex(hue: number, saturation: number, value: number): string {
+  const h = ((hue % 360) + 360) % 360
+  const s = Math.max(0, Math.min(1, saturation))
+  const v = Math.max(0, Math.min(1, value))
+  const c = v * s
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1))
+  const m = v - c
+  const sector = Math.floor(h / 60) % 6
+  const table: ReadonlyArray<readonly [number, number, number]> = [
+    [c, x, 0],
+    [x, c, 0],
+    [0, c, x],
+    [0, x, c],
+    [x, 0, c],
+    [c, 0, x],
+  ]
+  const rgb = table[sector] ?? [c, x, 0]
+  const channel = (n: number): string =>
+    Math.round(Math.max(0, Math.min(1, n + m)) * 255)
+      .toString(16)
+      .padStart(2, '0')
+  return `#${channel(rgb[0])}${channel(rgb[1])}${channel(rgb[2])}`
+}
 
 /** How many points around a lamina. Enough for lobes, cheap for a thousand plants. */
 const LAMINA_SAMPLES = 28
@@ -51,9 +73,24 @@ const LAMINA_SAMPLES = 28
 export function sceneFromShoot(
   shoot: Shoot,
   phenotype: Phenotype,
+  species: SpeciesTemplate,
   seed: string,
   tiltDeg = DEFAULT_TILT_DEG,
 ): Scene {
+  // Foliage colour comes from the species, because it is a species trait:
+  // rosemary is grey-green from its hairs and wax, a dandelion is dark green,
+  // and a jacaranda is a light yellow-green. Stems are a duller, browner
+  // version of the same hue rather than a separate fixed colour.
+  const leafFill = hsvToHex(
+    species.baseline.leafHue,
+    species.baseline.leafSaturation,
+    species.baseline.leafLightness,
+  )
+  const stemFill = hsvToHex(
+    species.baseline.leafHue - 22,
+    Math.min(1, species.baseline.leafSaturation + 0.14),
+    species.baseline.leafLightness * 0.85,
+  )
   const outline = phenotype.discrete['leaf.outline']?.expressed[0] ?? 'elliptic'
   const margin = phenotype.discrete['leaf.margin']?.expressed[0] ?? 'entire'
   const leafForm = phenotype.discrete['leaf.form']?.expressed[0] ?? 'simple'
@@ -146,7 +183,7 @@ export function sceneFromShoot(
         if (local.length < 3) continue
         const points = local.map(place)
         for (const point of points) include(point)
-        shapes.push({ role: 'leaf', points, fill: LEAF_FILL })
+        shapes.push({ role: 'leaf', points, fill: leafFill })
       }
       continue
     }
@@ -164,7 +201,7 @@ export function sceneFromShoot(
       { x: baseLocal.x - offsetLocal.x, y: baseLocal.y - offsetLocal.y },
     ].map(place)
     for (const point of quad) include(point)
-    shapes.push({ role: organ.kind, points: quad, fill: STEM_FILL })
+    shapes.push({ role: organ.kind, points: quad, fill: stemFill })
   }
 
   return { shapes, minX, minY, maxX, maxY }
