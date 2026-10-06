@@ -11,6 +11,7 @@ describe('layoutShoot', () => {
       makeOrgan('internode', { x: 0, y: 10, angle: 0, scale: 1 }, 10, 0.1),
     ],
     leaves: [makeOrgan('leaf', { x: 0, y: 10, angle: 90, scale: 1 }, 5, 1)],
+    flowers: [],
     branches: [],
   }
 
@@ -26,7 +27,7 @@ describe('layoutShoot', () => {
   })
 
   it('is empty for an empty shoot', () => {
-    expect(layoutShoot({ internodes: [], leaves: [], branches: [] })).toEqual([])
+    expect(layoutShoot({ internodes: [], leaves: [], flowers: [], branches: [] })).toEqual([])
   })
 
   it('attaches a leaf at its node and sends it out at its angle', () => {
@@ -49,6 +50,7 @@ describe('layoutShoot', () => {
     const branched: Shoot = {
       internodes: [makeOrgan('internode', { x: 0, y: 0, angle: 0, scale: 1 }, 10, 0.1)],
       leaves: [],
+      flowers: [],
       branches: [
         {
           node: 0,
@@ -58,6 +60,7 @@ describe('layoutShoot', () => {
               makeOrgan('internode', { x: 0, y: 0, angle: 0, scale: 1 }, 10, 0.1),
             ],
             leaves: [],
+            flowers: [],
             branches: [],
           },
         },
@@ -87,6 +90,8 @@ describe('layoutShoot', () => {
       apicalDominance: 0.5,
       branchAngle: 40,
       divergenceDeg: 55,
+      inflorescence: 'solitary',
+      flowerSize: 1,
       seed: 'layout',
     })
     const segments = layoutShoot(shoot)

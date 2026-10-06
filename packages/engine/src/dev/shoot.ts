@@ -21,6 +21,10 @@ export interface ShootGeometry {
    * near the ground, an erect herb's stand up around its stem.
    */
   readonly divergenceDeg: number
+  /** Which inflorescence the shoot builds, from the phenotype. */
+  readonly inflorescence: string
+  /** Width of one flower or head, in centimetres. */
+  readonly flowerSize: number
 }
 
 /** The growth forms the engine implements. */
@@ -135,10 +139,20 @@ export function shootGeometry(
   // the divergence is the ANGLE AT THE BASE, not the average posture.
   const divergenceDeg = form === 'rosette' ? 45 : 55
 
+  const inflorescence = phenotype.discrete['inflorescence.type']?.expressed[0] ?? 'solitary'
+  // A head is sized by the capitulum; a simple flower by its corolla. Both come
+  // from the species through the same baseline field, which is what lets a
+  // dandelion's 3 to 5 cm head and a mint's 2.5 mm corolla be the same code.
+  const flowerSize =
+    phenotype.quantitative['flower.diameter'] ??
+    (phenotype.quantitative['petal.length'] ?? 1) * 2
+
   return {
     nodes,
     pattern,
     divergenceDeg,
+    inflorescence,
+    flowerSize,
     internodeLength: phenotype.quantitative['internode.length'] ?? 1,
     leafLength: phenotype.quantitative['leaf.length'] ?? 1,
     leafWidth: phenotype.quantitative['leaf.width'] ?? 0.5,

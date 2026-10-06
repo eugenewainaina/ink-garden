@@ -51,7 +51,13 @@ export function renderScene(scene: Scene, options: SvgOptions = {}): Rendered {
   const toY = (y: number): number => height - padding - (y - scene.minY) * zoom
 
   const body = scene.shapes
-    .map((shape) => `<path d="${pathFor(shape, toX, toY)}" fill="${shape.fill}"/>`)
+    .map((shape) => {
+      const edge =
+        shape.stroke === undefined
+          ? ''
+          : ` stroke="${shape.stroke}" stroke-width="${(shape.strokeWidth ?? 0.05) * zoom}" stroke-linejoin="round"`
+      return `<path d="${pathFor(shape, toX, toY)}" fill="${shape.fill}"${edge}/>`
+    })
     .join('\n')
 
   return { body, width, height, toX, toY }

@@ -165,6 +165,8 @@ describe('buildShoot', () => {
     apicalDominance: 0.4,
     branchAngle: 40,
     divergenceDeg: 55,
+    inflorescence: 'solitary',
+    flowerSize: 1,
     seed: 'shoot',
   }
 
@@ -279,10 +281,19 @@ describe('grow dispatches on growth form', () => {
   it('implements two genuinely different loops, not one with a flag', () => {
     const erectShoot = grow(erect, DANDELION, 'form')
     const rosetteShoot = grow(rosette, DANDELION, 'form')
-    // A rosette has one internode, the crown, and no branches.
-    expect(rosetteShoot.internodes.length).toBe(1)
+    // A rosette is a compressed crown, plus a scape if it is flowering, and it
+    // never branches: offsets come from stolons or rhizomes, which are other
+    // growth forms.
+    expect(rosetteShoot.internodes.length).toBeLessThanOrEqual(2)
     expect(rosetteShoot.branches.length).toBe(0)
-    expect(erectShoot.internodes.length).toBeGreaterThan(1)
+    expect(rosetteShoot.leaves.length).toBeGreaterThan(4)
+    expect(erectShoot.internodes.length).toBeGreaterThan(2)
+    // Different topologies, not a flag: the rosette's leaves all share one
+    // height, and the erect shoot's are spread along its axis.
+    const rosetteHeights = new Set(rosetteShoot.leaves.map((l) => l.transform.y.toFixed(6)))
+    const erectHeights = new Set(erectShoot.leaves.map((l) => l.transform.y.toFixed(6)))
+    expect(rosetteHeights.size).toBe(1)
+    expect(erectHeights.size).toBeGreaterThan(1)
   })
 
   it('puts every rosette leaf at the crown, at one height', () => {
@@ -290,6 +301,15 @@ describe('grow dispatches on growth form', () => {
     const heights = new Set(shoot.leaves.map((leaf) => leaf.transform.y.toFixed(6)))
     expect(heights.size).toBe(1)
     expect(shoot.leaves.length).toBeGreaterThan(4)
+  })
+
+  it('raises a scape with a single head when a rosette flowers', () => {
+    const shoot = grow(rosette, DANDELION, 'form')
+    expect(shoot.flowers.length).toBe(1)
+    // The head sits at the top of the scape, above every leaf.
+    const head = shoot.flowers[0]
+    const highestLeaf = Math.max(...shoot.leaves.map((l) => l.transform.y))
+    expect(head?.transform.y ?? 0).toBeGreaterThan(highestLeaf)
   })
 
   it('makes a rosette low and wide and an erect shoot tall and narrow', () => {

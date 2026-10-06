@@ -4,6 +4,7 @@ import { leafDecomposition, leafOutline, type Point } from './leaf.ts'
 import { DEFAULT_TILT_DEG, placeOrgans, projectOrgans } from './layout.ts'
 import { growthFormOf } from './shoot.ts'
 import { requiredRadius, taperedRadius } from './allometry.ts'
+import { flowerShapes } from './flower.ts'
 import type { Shoot } from './meristem.ts'
 import type { Organ } from './structure.ts'
 
@@ -20,6 +21,15 @@ export interface SceneShape {
   /** A closed polygon in plant coordinates, y upward. */
   readonly points: readonly Point[]
   readonly fill: string
+  /**
+   * An optional edge.
+   *
+   * A white corolla on pale paper is invisible, and mint's really is white. A
+   * botanical illustration draws a faint edge for exactly this reason, so the
+   * colour stays true and the flower still reads.
+   */
+  readonly stroke?: string
+  readonly strokeWidth?: number
 }
 
 export interface Scene {
@@ -37,6 +47,19 @@ export interface Scene {
  * varies: rosemary reads grey from hairs and wax, which is low SATURATION at
  * the same hue, not a different green.
  */
+/**
+ * Roughly the width of a polygon, used to scale an outline with its size.
+ */
+function diameterOf(points: readonly Point[]): number {
+  let minX = Number.POSITIVE_INFINITY
+  let maxX = Number.NEGATIVE_INFINITY
+  for (const point of points) {
+    if (point.x < minX) minX = point.x
+    if (point.x > maxX) maxX = point.x
+  }
+  return Number.isFinite(minX) && maxX > minX ? maxX - minX : 0
+}
+
 function hsvToHex(hue: number, saturation: number, value: number): string {
   const h = ((hue % 360) + 360) % 360
   const s = Math.max(0, Math.min(1, saturation))
@@ -92,9 +115,30 @@ export function sceneFromShoot(
     Math.min(1, species.baseline.leafSaturation + 0.14),
     species.baseline.leafLightness * 0.85,
   )
+
+  // Flower colour comes from the pigment loci, which already express correctly:
+  // a dandelion at hue 52 is golden yellow, a jacaranda at 271 is blue-purple,
+  // a rosemary at 277 is violet-blue.
+  const petalFill = hsvToHex(
+    phenotype.quantitative['pigment.hue'] ?? 40,
+    phenotype.quantitative['pigment.saturation'] ?? 0.5,
+    phenotype.quantitative['pigment.lightness'] ?? 0.6,
+  )
+  const centreFill = hsvToHex(
+    (phenotype.quantitative['pigment.hue'] ?? 40) - 12,
+    Math.min(1, (phenotype.quantitative['pigment.saturation'] ?? 0.5) + 0.1),
+    Math.max(0.15, (phenotype.quantitative['pigment.lightness'] ?? 0.6) * 0.78),
+  )
+  const petalEdge = hsvToHex(
+    (phenotype.quantitative['pigment.hue'] ?? 40) - 20,
+    Math.min(1, (phenotype.quantitative['pigment.saturation'] ?? 0.5) + 0.2),
+    Math.max(0.2, (phenotype.quantitative['pigment.lightness'] ?? 0.6) * 0.62),
+  )
+  const colours = { petal: petalFill, centre: centreFill }
   const outline = phenotype.discrete['leaf.outline']?.expressed[0] ?? 'elliptic'
   const margin = phenotype.discrete['leaf.margin']?.expressed[0] ?? 'entire'
   const leafForm = phenotype.discrete['leaf.form']?.expressed[0] ?? 'simple'
+  const inflorescence = phenotype.discrete['inflorescence.type']?.expressed[0] ?? 'solitary'
   const laminae = leafDecomposition(leafForm)
 
   // How much the midrib turns across the blade, in radians. A real lamina is
@@ -149,6 +193,20 @@ export function sceneFromShoot(
       x: organ.x + local.x * cos + local.y * sin,
       y: organ.y - local.x * sin + local.y * cos,
     })
+
+    if (organ.kind === 'flower') {
+      for (const part of flowerShapes(organ, phenotype, inflorescence, colours, `${seed}|${i}`)) {
+        for (const point of part.points) include(point)
+        shapes.push({
+          role: 'flower',
+          points: part.points,
+          fill: part.fill,
+          stroke: petalEdge,
+          strokeWidth: Math.max(0.02, diameterOf(part.points) * 0.012),
+        })
+      }
+      continue
+    }
 
     if (organ.kind === 'leaf') {
       const foreshortening = organ.scale

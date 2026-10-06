@@ -106,6 +106,10 @@ export interface ShootConfig {
   readonly apicalDominance: number
   readonly branchAngle: number
   readonly divergenceDeg: number
+  /** Which inflorescence to build, from the phenotype. */
+  readonly inflorescence: string
+  /** How wide one flower or head is, in centimetres. */
+  readonly flowerSize: number
   readonly seed: string
 }
 
@@ -120,6 +124,13 @@ export interface Branch {
 export interface Shoot {
   readonly internodes: readonly Organ[]
   readonly leaves: readonly Organ[]
+  /**
+   * Flowers, placed like leaves: a flower's `transform.y` names the node it
+   * sits on. A separate list rather than a kind of leaf, because a flower is
+   * not an appendage of the same order and the inflorescence decides how many
+   * there are and where.
+   */
+  readonly flowers: readonly Organ[]
   readonly branches: readonly Branch[]
 }
 
@@ -135,6 +146,61 @@ export interface Shoot {
  * rises when growth over time arrives in M1, not before.
  */
 const MAX_BRANCH_DEPTH = 1
+
+/**
+ * Where flowers sit on a shoot, as node indices.
+ *
+ * One rule per inflorescence, from the floras. A HEAD is terminal and solitary,
+ * which is why a dandelion has one scape and one capitulum. A PANICLE is a
+ * branched terminal cluster. A SPIKE carries whorls up the top of the stem,
+ * which is what a mint does with its verticillasters. A CYME is a small cluster
+ * in the upper axils, which is rosemary.
+ */
+export function flowerNodes(
+  inflorescence: string,
+  nodes: number,
+): readonly { readonly node: number; readonly azimuth: number }[] {
+  if (nodes <= 0) return []
+  const last = nodes - 1
+  const whorl = (node: number, count: number): { node: number; azimuth: number }[] =>
+    Array.from({ length: count }, (_, i) => ({ node, azimuth: (i * 360) / count }))
+
+  switch (inflorescence) {
+    case 'head':
+    case 'solitary':
+      return [{ node: last, azimuth: 0 }]
+    case 'panicle':
+    case 'corymb': {
+      // A branched terminal cluster: a few nodes each carrying a small group.
+      const out: { node: number; azimuth: number }[] = []
+      for (const node of [last, last - 1, last - 2]) {
+        if (node >= 0) out.push(...whorl(node, 3))
+      }
+      return out
+    }
+    case 'spike':
+    case 'raceme': {
+      // A VERTICILLASTER is a whorl of flowers at a node, and a mint's spike is
+      // a column of them. One flower per node is not a verticillaster and does
+      // not read as one, which is why the first attempt drew nothing visible.
+      const from = Math.max(0, Math.floor(nodes * 0.55))
+      const out: { node: number; azimuth: number }[] = []
+      for (let node = from; node <= last; node += 1) out.push(...whorl(node, 4))
+      return out
+    }
+    case 'cyme':
+    case 'umbel': {
+      // Clusters of two or three in the upper axils, which is rosemary.
+      const out: { node: number; azimuth: number }[] = []
+      for (let node = Math.max(0, last - 2); node <= last; node += 1) {
+        out.push(...whorl(node, 3))
+      }
+      return out
+    }
+    default:
+      return [{ node: last, azimuth: 0 }]
+  }
+}
 
 /**
  * Grow a shoot, and let some of its axillary buds become branches.
@@ -175,7 +241,42 @@ export function buildShoot(config: ShootConfig, depth = 0): Shoot {
     }
   }
 
-  return { internodes: phytomers.internodes, leaves: phytomers.leaves, branches }
+  // Flowers go on the same nodes the leaves do, at the height the phytomer
+  // recorded, so one placement path still serves everything.
+  const flowers: Organ[] = []
+  const nodeHeights = new Map<number, number>()
+  {
+    let height = 0
+    for (let i = 0; i < phytomers.internodes.length; i += 1) {
+      const internode = phytomers.internodes[i]
+      height += internode?.length ?? 0
+      nodeHeights.set(i, height)
+    }
+  }
+  for (const spot of flowerNodes(config.inflorescence, config.nodes)) {
+    const y = nodeHeights.get(spot.node)
+    if (y === undefined) continue
+    // A flower faces outward like a leaf, so a whorl of them spreads around the
+    // stem and reads as a whorl from a tilted view rather than as one flower.
+    const direction = leafDirection3(spot.azimuth, 70)
+    const projected = projectDir(direction, 0)
+    flowers.push(
+      makeOrgan(
+        'flower',
+        {
+          x: 0,
+          y,
+          angle: projected.angle,
+          scale: projected.scale,
+          depth: direction.z,
+        },
+        config.flowerSize,
+        config.flowerSize,
+      ),
+    )
+  }
+
+  return { internodes: phytomers.internodes, leaves: phytomers.leaves, flowers, branches }
 }
 
 /** A line from one point to another, in absolute plant coordinates, y upward. */

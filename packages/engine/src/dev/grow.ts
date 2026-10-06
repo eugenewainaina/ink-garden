@@ -31,12 +31,16 @@ export function grow(
  * A rosette: a compressed crown with leaves radiating from it.
  *
  * The payoff of the research's "nearly free" claim, made concrete. There is no
- * new maths here. A rosette is the existing leaf placement with elongation
+ * new maths here: a rosette is the existing leaf placement with elongation
  * switched off and the divergence widened, so the leaves all emerge at one
- * height and fan out flat instead of climbing a stem.
+ * height and fan out flat instead of climbing a stem. The crown is a very short
+ * internode rather than none, because that is what a compressed stem is and
+ * because placement needs a node to attach to.
  *
- * The crown is a very short internode rather than none, because that is what a
- * compressed stem is, and because placement needs a node to attach to.
+ * When it flowers it also raises a SCAPE, a stem with greatly elongated
+ * internodes and no leaves. The Flora of New Zealand gives the dandelion's as 3
+ * to 35 cm tall, stout and hollow, carrying a single head. On a rosette that
+ * scape is the only vertical stem the plant ever makes.
  */
 export function growRosette(geometry: ShootGeometry, seed: string): Shoot {
   const CROWN_LENGTH = 0.15
@@ -48,6 +52,28 @@ export function growRosette(geometry: ShootGeometry, seed: string): Shoot {
   const internodes: Organ[] = [
     makeOrgan('internode', { x: 0, y: 0, angle: 0, scale: 1 }, CROWN_LENGTH, 0.1),
   ]
+
+  // The scape, built from elongated internodes so the placement walk finds the
+  // node the flower sits on without any special case.
+  const flowers: Organ[] = []
+  // A dandelion's scape lifts the head clear of the rosette, so it is as tall
+  // as the leaves rather than a fixed number of internodes. The Flora of New
+  // Zealand gives 3 to 35 cm, and a plant whose head sits among its own leaves
+  // is not one.
+  const scapeLength = Math.max(geometry.leafLength * 1.2, geometry.internodeLength * 5)
+  if (scapeLength > 0 && geometry.flowerSize > 0) {
+    internodes.push(
+      makeOrgan('internode', { x: 0, y: CROWN_LENGTH, angle: 0, scale: 1 }, scapeLength, 0.12),
+    )
+    flowers.push(
+      makeOrgan(
+        'flower',
+        { x: 0, y: CROWN_LENGTH + scapeLength, angle: 0, scale: 1 },
+        geometry.flowerSize,
+        geometry.flowerSize,
+      ),
+    )
+  }
 
   // A rosette carries more leaves than an erect shoot of the same stature,
   // because the leaves are the whole plant rather than appendages on an axis.
@@ -79,5 +105,5 @@ export function growRosette(geometry: ShootGeometry, seed: string): Shoot {
 
   // A rosette does not branch. Offsets come from stolons or rhizomes, which are
   // other growth forms and not this one.
-  return { internodes, leaves, branches: [] }
+  return { internodes, leaves, flowers, branches: [] }
 }

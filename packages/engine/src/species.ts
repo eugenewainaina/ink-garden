@@ -178,7 +178,7 @@ export const ROSEMARY: SpeciesTemplate = {
     leafHue: 104,
     leafSaturation: 0.42,
     leafLightness: 0.42,
-    flowerSize: 1,
+    flowerSize: 1.4,
     stemThickness: 1.5,
     thermalBase: 6,
     thermalConstant: 1400,
@@ -234,7 +234,7 @@ export const DANDELION: SpeciesTemplate = {
     leafHue: 100,
     leafSaturation: 0.55,
     leafLightness: 0.42,
-    flowerSize: 2.5,
+    flowerSize: 5.5,
     stemThickness: 0.4,
     thermalBase: 4,
     thermalConstant: 420,
@@ -285,7 +285,7 @@ export const SPEARMINT: SpeciesTemplate = {
     leafHue: 100,
     leafSaturation: 0.48,
     leafLightness: 0.54,
-    flowerSize: 0.5,
+    flowerSize: 0.35,
     stemThickness: 0.4,
     thermalBase: 5,
     thermalConstant: 700,
@@ -307,7 +307,14 @@ export const SPEARMINT: SpeciesTemplate = {
     'inflorescence.type': [0, 0.95, 0, 0, 0, 0, 0, 0.05],
     'flower.symmetry': [0, 1],
     'petal.shape': [0, 0, 0.4, 0.6, 0],
-    'pigment.anthocyanidin': [0.1, 0.6, 0.25, 0.05],
+    // A white corolla is near-absent anthocyanin. The frequency has to be
+    // pushed harder than the 22 per cent a pale pink would suggest, because
+    // the locus is codominant and its allele order runs none, pelargonidin,
+    // cyanidin, delphinidin: any anthocyanin outranks none in the dominance
+    // series, and dominance is a property of the locus rather than of the
+    // species. A species that needs the normal state to dominate cannot say
+    // so, which is a real limitation of the model and not just of this line.
+    'pigment.anthocyanidin': [0.97, 0.03, 0, 0],
     'pigment.carotenoid': [1, 0, 0, 0],
     'photoperiod.response': [0.2, 0.3, 0.5],
     'vernalization.required': [1, 0],
@@ -332,7 +339,7 @@ export const JACARANDA: SpeciesTemplate = {
     leafHue: 92,
     leafSaturation: 0.38,
     leafLightness: 0.66,
-    flowerSize: 3,
+    flowerSize: 4.5,
     stemThickness: 8,
     thermalBase: 10,
     thermalConstant: 18000,

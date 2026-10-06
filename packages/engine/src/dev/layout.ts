@@ -233,6 +233,21 @@ function walkShoot(
     })
   }
 
+  for (const flower of shoot.flowers) {
+    const node = nodeFromAlong(flower.transform.y)
+    const stem = nodes[node]
+    if (stem === undefined) continue
+    // A flower faces outward from the axis, and its own angle is not a
+    // phyllotaxis azimuth, so it keeps the shoot's lean and nothing more.
+    out.push({
+      kind: 'flower',
+      position: stem,
+      direction: leanInPicture(UP, angle),
+      length: flower.length,
+      width: flower.width,
+    })
+  }
+
   for (const branch of shoot.branches) {
     const stem = nodes[branch.node]
     if (stem === undefined) continue
