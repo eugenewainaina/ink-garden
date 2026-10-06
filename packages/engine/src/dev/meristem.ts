@@ -1,7 +1,6 @@
 import { rngFrom } from '../rng.ts'
 import { makeOrgan, type Organ } from './structure.ts'
 import {
-  LEAF_DIVERGENCE_DEG,
   leavesPerNode,
   nextBudAngle,
   projectLeaf,
@@ -14,6 +13,8 @@ export interface PhytomerConfig {
   readonly internodeLength: number
   readonly leafLength: number
   readonly leafWidth: number
+  /** How far a leaf stands out from the stem, in degrees. */
+  readonly divergenceDeg: number
   readonly seed: string
 }
 
@@ -54,7 +55,7 @@ export function growPhytomers(config: PhytomerConfig): Phytomers {
       const leafLength = config.leafLength * (0.8 + leafR() * 0.4)
       // Divergence varies a little per leaf, because a plant whose leaves all
       // leave at exactly the same angle reads as a diagram.
-      const divergence = LEAF_DIVERGENCE_DEG * (0.8 + leafR() * 0.4)
+      const divergence = config.divergenceDeg * (0.8 + leafR() * 0.4)
       const projected = projectLeaf(azimuth, divergence)
       leaves.push(
         makeOrgan(
@@ -101,6 +102,7 @@ export interface ShootConfig {
   readonly leafWidth: number
   readonly apicalDominance: number
   readonly branchAngle: number
+  readonly divergenceDeg: number
   readonly seed: string
 }
 
@@ -134,6 +136,7 @@ export function buildShoot(config: ShootConfig, depth = 0): Shoot {
     internodeLength: config.internodeLength,
     leafLength: config.leafLength,
     leafWidth: config.leafWidth,
+    divergenceDeg: config.divergenceDeg,
     seed: config.seed,
   })
 

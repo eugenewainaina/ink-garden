@@ -1,0 +1,20 @@
+{
+  "name": "@ink-garden/render",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "gallery": "node src/cli/gallery.ts"
+  },
+  "dependencies": {
+    "@ink-garden/engine": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4"
+  }
+}

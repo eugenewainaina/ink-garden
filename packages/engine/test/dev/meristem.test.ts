@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { makeOrgan } from '../../src/dev/structure.ts'
 import { buildShoot, growPhytomers, shouldBranch } from '../../src/dev/meristem.ts'
+import { grow } from '../../src/dev/grow.ts'
+import { DANDELION } from '../../src/species.ts'
 import type { PhytomerConfig, Shoot, ShootConfig } from '../../src/dev/meristem.ts'
 
 describe('growPhytomers', () => {
@@ -10,6 +12,7 @@ describe('growPhytomers', () => {
     internodeLength: 10,
     leafLength: 6,
     leafWidth: 2,
+    divergenceDeg: 55,
     seed: 'phyto',
   }
 
@@ -160,6 +163,7 @@ describe('buildShoot', () => {
     leafWidth: 2,
     apicalDominance: 0.4,
     branchAngle: 40,
+    divergenceDeg: 55,
     seed: 'shoot',
   }
 
@@ -237,5 +241,63 @@ describe('buildShoot', () => {
     const empty = buildShoot({ ...shootConfig, nodes: 0 })
     expect(empty.internodes).toEqual([])
     expect(empty.branches).toEqual([])
+  })
+})
+
+describe('grow dispatches on growth form', () => {
+  const erect = {
+    discrete: {
+      'habit.growth_form': {
+        expressed: ['erect'],
+        winner: 0,
+        blended: false,
+        secondaryWeight: 0,
+      },
+    },
+    quantitative: {},
+  }
+  const rosette = {
+    discrete: {
+      'habit.growth_form': {
+        expressed: ['rosette'],
+        winner: 1,
+        blended: false,
+        secondaryWeight: 0,
+      },
+    },
+    quantitative: {},
+  }
+
+  it('implements two genuinely different loops, not one with a flag', () => {
+    const erectShoot = grow(erect, DANDELION, 'form')
+    const rosetteShoot = grow(rosette, DANDELION, 'form')
+    // A rosette has one internode, the crown, and no branches.
+    expect(rosetteShoot.internodes.length).toBe(1)
+    expect(rosetteShoot.branches.length).toBe(0)
+    expect(erectShoot.internodes.length).toBeGreaterThan(1)
+  })
+
+  it('puts every rosette leaf at the crown, at one height', () => {
+    const shoot = grow(rosette, DANDELION, 'form')
+    const heights = new Set(shoot.leaves.map((leaf) => leaf.transform.y.toFixed(6)))
+    expect(heights.size).toBe(1)
+    expect(shoot.leaves.length).toBeGreaterThan(4)
+  })
+
+  it('fans rosette leaves out flatter than an erect shoot does', () => {
+    const steepest = (shoot: Shoot): number =>
+      Math.max(...shoot.leaves.map((leaf) => Math.abs(leaf.transform.angle)))
+    expect(steepest(grow(rosette, DANDELION, 'form'))).toBeGreaterThan(
+      steepest(grow(erect, DANDELION, 'form')),
+    )
+  })
+
+  it('is deterministic', () => {
+    expect(grow(rosette, DANDELION, 'form')).toEqual(grow(rosette, DANDELION, 'form'))
+  })
+
+  it('falls back to erect when the habit is absent', () => {
+    const bare = { discrete: {}, quantitative: {} }
+    expect(grow(bare, DANDELION, 'form').internodes.length).toBeGreaterThan(1)
   })
 })

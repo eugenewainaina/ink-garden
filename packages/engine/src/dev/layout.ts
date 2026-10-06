@@ -3,6 +3,26 @@ import type { Shoot } from './meristem.ts'
 
 const DEG_TO_RAD = Math.PI / 180
 
+/**
+ * An organ placed in absolute plant coordinates.
+ *
+ * This is the ONE placement path. The silhouette dump and the geometry stage
+ * both derive from it, so there is no second walk that could drift from this
+ * one. A `Segment` is one reduction of it, not a parallel model.
+ */
+export interface PlacedOrgan {
+  readonly kind: Organ['kind']
+  /** Base of the organ: where it attaches. */
+  readonly x: number
+  readonly y: number
+  /** In-plane angle from vertical, anticlockwise, degrees. */
+  readonly angle: number
+  /** Foreshortening from projecting a 3D organ onto the picture plane. */
+  readonly scale: number
+  readonly length: number
+  readonly width: number
+}
+
 export interface Segment {
   readonly kind: Organ['kind']
   readonly x1: number
@@ -13,8 +33,8 @@ export interface Segment {
 }
 
 /**
- * Flatten a shoot into absolute line segments, composing transforms through the
- * parent chain.
+ * Walk a shoot into absolute organ placements, composing transforms through
+ * the parent chain.
  *
  * The plan's first draft offset a branch sideways without rotating it, which is
  * enough to place organs but useless for looking at, because whether branches
@@ -25,15 +45,41 @@ export interface Segment {
  * `y` grows upward, as a plant does. A renderer flips it, because SVG and
  * canvas grow downward.
  */
+export function placeOrgans(
+  shoot: Shoot,
+  originX = 0,
+  originY = 0,
+  baseAngle = 0,
+): readonly PlacedOrgan[] {
+  const out: PlacedOrgan[] = []
+  walkShoot(shoot, originX, originY, baseAngle, out)
+  return out
+}
+
+/**
+ * Reduce placed organs to centre lines, for a silhouette.
+ *
+ * A derivation rather than a second placement path: it consumes what
+ * `placeOrgans` produced and throws away everything except the axis.
+ */
 export function layoutShoot(
   shoot: Shoot,
   originX = 0,
   originY = 0,
   baseAngle = 0,
 ): readonly Segment[] {
-  const out: Segment[] = []
-  walkShoot(shoot, originX, originY, baseAngle, out)
-  return out
+  return placeOrgans(shoot, originX, originY, baseAngle).map((organ) => {
+    const radians = organ.angle * DEG_TO_RAD
+    const drawn = organ.length * organ.scale
+    return {
+      kind: organ.kind,
+      x1: organ.x,
+      y1: organ.y,
+      x2: organ.x + drawn * Math.sin(radians),
+      y2: organ.y + drawn * Math.cos(radians),
+      width: organ.width,
+    }
+  })
 }
 
 function walkShoot(
@@ -41,7 +87,7 @@ function walkShoot(
   originX: number,
   originY: number,
   baseAngle: number,
-  out: Segment[],
+  out: PlacedOrgan[],
 ): void {
   let x = originX
   let y = originY
@@ -62,10 +108,11 @@ function walkShoot(
     const nextY = y + internode.length * Math.cos(radians)
     out.push({
       kind: 'internode',
-      x1: x,
-      y1: y,
-      x2: nextX,
-      y2: nextY,
+      x,
+      y,
+      angle: here,
+      scale: 1,
+      length: internode.length,
       width: internode.width,
     })
     x = nextX
@@ -87,15 +134,13 @@ function walkShoot(
     const node = nodeFromAlong(leaf.transform.y)
     const stem = nodes[node]
     if (stem === undefined) continue
-    const radians = (angle + leaf.transform.angle) * DEG_TO_RAD
-    // A projected leaf is shorter than it is, which is what `scale` carries.
-    const drawn = leaf.length * leaf.transform.scale
     out.push({
       kind: 'leaf',
-      x1: stem.x,
-      y1: stem.y,
-      x2: stem.x + drawn * Math.sin(radians),
-      y2: stem.y + drawn * Math.cos(radians),
+      x: stem.x,
+      y: stem.y,
+      angle: angle + leaf.transform.angle,
+      scale: leaf.transform.scale,
+      length: leaf.length,
       width: leaf.width,
     })
   }

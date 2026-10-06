@@ -86,6 +86,7 @@ describe('layoutShoot', () => {
       leafWidth: 1,
       apicalDominance: 0.5,
       branchAngle: 40,
+      divergenceDeg: 55,
       seed: 'layout',
     })
     const segments = layoutShoot(shoot)

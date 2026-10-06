@@ -13,6 +13,29 @@ export interface ShootGeometry {
   readonly apicalDominance: number
   /** Degrees from the parent axis. */
   readonly branchAngle: number
+  /**
+   * How far a leaf stands out from the stem, in degrees.
+   *
+   * A trait rather than a module constant, because it is the difference
+   * between a rosette and an upright herb: a rosette's leaves lie out flat
+   * near the ground, an erect herb's stand up around its stem.
+   */
+  readonly divergenceDeg: number
+}
+
+/** The growth forms the engine implements. */
+export type GrowthForm = 'erect' | 'rosette'
+
+/**
+ * Which growth form a plant takes.
+ *
+ * Canalised, so a species pins it and reading an expressed allele is enough.
+ * An unknown or absent value falls back to erect, which is the state every
+ * plant was in before this locus existed.
+ */
+export function growthFormOf(phenotype: Phenotype): GrowthForm {
+  const expressed = phenotype.discrete['habit.growth_form']?.expressed[0]
+  return expressed === 'rosette' ? 'rosette' : 'erect'
 }
 
 const PATTERNS: readonly Phyllotaxis[] = ['alternate', 'decussate', 'whorled', 'spiral']
@@ -48,9 +71,13 @@ export function shootGeometry(
   // is not zero: a branch at zero degrees is indistinguishable from the stem.
   const branchAngle = 12 + normalisedTrait(phenotype, 'branch.angle') * 58
 
+  const form = growthFormOf(phenotype)
+  const divergenceDeg = form === 'rosette' ? 78 : 55
+
   return {
     nodes,
     pattern,
+    divergenceDeg,
     internodeLength: phenotype.quantitative['internode.length'] ?? 1,
     leafLength: phenotype.quantitative['leaf.length'] ?? 1,
     leafWidth: phenotype.quantitative['leaf.width'] ?? 0.5,
