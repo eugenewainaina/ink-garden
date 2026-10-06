@@ -15,6 +15,72 @@ export interface SvgOptions {
   readonly background?: string
   /** Extra scale applied before framing. */
   readonly zoom?: number
+  /**
+   * Draw it as ink on paper.
+   *
+   * Everything stays vector: the grain is an SVG turbulence filter, the flecks
+   * are a tiled pattern, and the wobble on every edge is a displacement map. A
+   * filter is how an ink drawing is faked in a vector format, and it keeps the
+   * output resolution-independent, which a raster texture would not.
+   */
+  readonly ink?: boolean
+  /** Seeds the paper; the same seed gives the same sheet. */
+  readonly seed?: string
+}
+
+/** A small integer generator, so the paper is reproducible without a dependency. */
+function paperRandom(seed: string): () => number {
+  let state = 2166136261
+  for (let i = 0; i < seed.length; i += 1) {
+    state ^= seed.charCodeAt(i)
+    state = Math.imul(state, 16777619)
+  }
+  return () => {
+    state ^= state << 13
+    state ^= state >>> 17
+    state ^= state << 5
+    return ((state >>> 0) % 100000) / 100000
+  }
+}
+
+/**
+ * A tiled, gold-flecked ground.
+ *
+ * A tiled pattern rather than thousands of individual flecks, because flecks
+ * are a texture and a texture that repeats is what paper does. About half a per
+ * cent of the area is a warm brown, which is what makes the ground read as
+ * handmade paper rather than as a flat colour.
+ */
+function paperDefs(seed: string): string {
+  const random = paperRandom(seed)
+  const tile = 140
+  // About half a per cent of the area, at the size the reference uses. The
+  // first attempt drew twenty-two flecks at a radius of up to 1.8, which at
+  // drawing scale is a field of large dots rather than a flecked paper: flecks
+  // have to be numerous and tiny or the eye reads them as objects.
+  const flecks: string[] = []
+  for (let i = 0; i < 92; i += 1) {
+    const x = (random() * tile).toFixed(1)
+    const y = (random() * tile).toFixed(1)
+    const r = (0.18 + random() * 0.45).toFixed(2)
+    const shade = 0.55 + random() * 0.35
+    flecks.push(
+      `<circle cx="${x}" cy="${y}" r="${r}" fill="rgb(${Math.round(200 * shade)},${Math.round(150 * shade)},${Math.round(70 * shade)})" opacity="${(0.5 + random() * 0.5).toFixed(2)}"/>`,
+    )
+  }
+  return `<pattern id="dsh-flecks" width="${tile}" height="${tile}" patternUnits="userSpaceOnUse">${flecks.join('')}</pattern>
+<filter id="dsh-grain" x="0" y="0" width="100%" height="100%">
+  <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="4" result="n"/>
+  <feColorMatrix in="n" type="saturate" values="0" result="g"/>
+  <feComponentTransfer in="g" result="speckle">
+    <feFuncA type="linear" slope="0.22" intercept="0"/>
+  </feComponentTransfer>
+  <feComposite in="speckle" in2="SourceGraphic" operator="over"/>
+</filter>
+<filter id="dsh-ink" x="-6%" y="-6%" width="112%" height="112%">
+  <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="3" seed="7" result="warp"/>
+  <feDisplacementMap in="SourceGraphic" in2="warp" scale="2.6" xChannelSelector="R" yChannelSelector="G"/>
+</filter>`
 }
 
 function pathFor(shape: SceneShape, toX: (x: number) => number, toY: (y: number) => number): string {
@@ -67,9 +133,25 @@ export function renderScene(scene: Scene, options: SvgOptions = {}): Rendered {
 
 export function toSvg(scene: Scene, options: SvgOptions = {}): string {
   const rendered = renderScene(scene, options)
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${rendered.width.toFixed(1)}" height="${rendered.height.toFixed(1)}" viewBox="0 0 ${rendered.width.toFixed(1)} ${rendered.height.toFixed(1)}">
-<rect width="${rendered.width.toFixed(1)}" height="${rendered.height.toFixed(1)}" fill="${options.background ?? '#faf7ef'}"/>
+  const width = rendered.width.toFixed(1)
+  const height = rendered.height.toFixed(1)
+  const background = options.background ?? '#faf7ef'
+
+  if (!options.ink) {
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+<rect width="${width}" height="${height}" fill="${background}"/>
 ${rendered.body}
+</svg>
+`
+  }
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+<defs>${paperDefs(options.seed ?? 'ink-garden')}</defs>
+<rect width="${width}" height="${height}" fill="${background}"/>
+<rect width="${width}" height="${height}" fill="url(#dsh-flecks)" filter="url(#dsh-grain)"/>
+<g filter="url(#dsh-ink)">
+${rendered.body}
+</g>
 </svg>
 `
 }

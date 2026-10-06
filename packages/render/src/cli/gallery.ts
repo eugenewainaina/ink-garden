@@ -86,7 +86,24 @@ chosen.forEach((species, row) => {
   })
 })
 
-const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+// The ink layer, applied to the whole sheet rather than per cell, so one
+// turbulence field runs across the paper as it would on a real one.
+const ink = args['ink'] === 'true'
+const sheet = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+${parts.join('\n')}
+</svg>`
+const svg = ink
+  ? toSvg(
+      {
+        shapes: [],
+        minX: 0,
+        minY: 0,
+        maxX: width,
+        maxY: height,
+      },
+      { ink: true, seed: args['seed'] ?? 'gallery' },
+    ).replace('</svg>', `${sheet.replace(/<\/?svg[^>]*>/g, '')}</svg>`)
+  : `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
 <rect width="${width}" height="${height}" fill="#faf7ef"/>
 ${parts.join('\n')}
 </svg>
