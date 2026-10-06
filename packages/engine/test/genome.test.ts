@@ -7,9 +7,11 @@ import {
   migrateGenome,
   serialiseGenome,
   allelePair,
+  founderGenome,
   type Genome,
 } from '../src/genome.ts'
-import { LOCI } from '../src/loci.ts'
+import { LOCI, locusById, locusIndex } from '../src/loci.ts'
+import { ROSEMARY } from '../src/species.ts'
 
 const half = (): Genome => createGenome(LOCI.map(() => [0, 0] as const))
 
@@ -124,3 +126,77 @@ describe('allelePair', () => {
 function allelesOf(g: Genome): number[][] {
   return g.alleles.map((pair) => [pair[0], pair[1]])
 }
+
+describe('genome versioning and migration', () => {
+  it('is at the version the added loci require', () => {
+    // Bumped when habit.growth_form and leaf.outline were appended.
+    expect(GENOME_VERSION).toBe(2)
+  })
+
+  it('migrates a version 1 genome by padding, never by rewriting', () => {
+    // A version 1 genome is a shorter positional array. Migration must append
+    // and must leave every existing locus byte-identical, or a plant the user
+    // has known for a year becomes a different plant.
+    const before = LOCI.length - 2
+    const old = createGenome(
+      Array.from({ length: before }, (_, i) => {
+        const locus = LOCI[i]
+        if (locus === undefined) throw new Error('bad fixture')
+        const count = locus.kind === 'discrete' ? locus.alleles.length : 2
+        return [i % count, (i + 1) % count] as const
+      }),
+    )
+    const migrated = migrateGenome({ version: 1, alleles: old.alleles })
+
+    expect(migrated.alleles.length).toBe(LOCI.length)
+    expect(migrated.version).toBe(GENOME_VERSION)
+    for (let i = 0; i < before; i += 1) {
+      expect(migrated.alleles[i]).toEqual(old.alleles[i])
+    }
+  })
+
+  it('pads with the reference allele, so a migrated plant keeps its look', () => {
+    const old = createGenome(
+      LOCI.map((locus) => {
+        const count = locus.kind === 'discrete' ? locus.alleles.length : 2
+        return [0, Math.min(1, count - 1)] as const
+      }).slice(0, LOCI.length - 2),
+    )
+    const migrated = migrateGenome({ version: 1, alleles: old.alleles })
+
+    for (const id of ['habit.growth_form', 'leaf.outline']) {
+      const locus = locusById(id)
+      if (locus.kind !== 'discrete') throw new Error('expected discrete')
+      const reference = locus.referenceAllele ?? 0
+      const same = locus.alleles[reference]
+      const pair = migrated.alleles[locusIndex(id)]
+      expect(pair).toBeDefined()
+      expect(locus.alleles[pair?.[0] ?? -1], id).toBe(same)
+      expect(locus.alleles[pair?.[1] ?? -1], id).toBe(same)
+    }
+  })
+
+  it('means "as before" by its references: erect, and a plain leaf', () => {
+    const habit = locusById('habit.growth_form')
+    const outline = locusById('leaf.outline')
+    if (habit.kind !== 'discrete' || outline.kind !== 'discrete') {
+      throw new Error('expected discrete')
+    }
+    expect(habit.alleles[habit.referenceAllele ?? 0]).toBe('erect')
+    expect(outline.alleles[outline.referenceAllele ?? 0]).toBe('elliptic')
+  })
+
+  it('appended the deep-lobe margin terms rather than inserting them', () => {
+    // `entire` through `lobed` must keep indices 0 to 3, or every stored
+    // genome's leaf margin changes meaning.
+    const margin = locusById('leaf.margin')
+    if (margin.kind !== 'discrete') throw new Error('expected discrete')
+    expect(margin.alleles.slice(0, 4)).toEqual(['entire', 'serrate', 'dentate', 'lobed'])
+    expect(margin.alleles.slice(4)).toEqual(['crenate', 'pinnatifid', 'runcinate'])
+  })
+
+  it('leaves an already-current genome untouched', () => {
+    const genome = founderGenome(ROSEMARY, 'current')
+    expect(migrateGenome(genome)).toBe(genome)
+  })
+})

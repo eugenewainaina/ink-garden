@@ -2,7 +2,7 @@ import { LOCI, locusAt, locusIndex, type Locus } from './loci.ts'
 import { hash32, pickWeighted, rngFrom } from './rng.ts'
 import { defaultDistribution, type SpeciesTemplate } from './species.ts'
 
-export const GENOME_VERSION = 1
+export const GENOME_VERSION = 2
 
 export type Allele = number
 
@@ -93,14 +93,18 @@ export function migrateGenome(genome: Genome): Genome {
     return [pair[0], pair[1]] as const
   })
 
-  const seed = `${genomeId(genome)}|migrate`
+  // Fill with the REFERENCE allele, not a random one.
+  //
+  // The first version drew new alleles uniformly. That gave every migrated
+  // plant an arbitrary shape the moment a locus was added, which contradicts
+  // the rule that nothing is ever lost: a plant the user has known for a year
+  // should not become a different plant because the genome grew. The reference
+  // allele is chosen to mean "as before" for exactly this reason, so padding
+  // with it leaves the plant looking the way it did.
   for (let i = alleles.length; i < LOCI.length; i += 1) {
     const locus = locusAt(i)
-    const r = rngFrom(`${seed}|${locus.id}`)
-    const count = alleleCount(locus)
-    const a = pickWeighted(new Array<number>(count).fill(1), r())
-    const b = pickWeighted(new Array<number>(count).fill(1), r())
-    alleles.push([a, b] as const)
+    const reference = locus.kind === 'discrete' ? (locus.referenceAllele ?? 0) : 0
+    alleles.push([reference, reference] as const)
   }
 
   return { version: GENOME_VERSION, alleles }

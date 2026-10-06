@@ -150,7 +150,9 @@ export const ROSEMARY: SpeciesTemplate = {
   },
   distributions: {
     'leaf.form': [0.95, 0.05, 0, 0, 0],
-    'leaf.margin': [1, 0, 0, 0],
+    'leaf.margin': [1, 0, 0, 0, 0, 0, 0],
+    'leaf.outline': [0, 0, 0, 0, 0, 1, 0, 0],
+    'habit.growth_form': [1, 0],
     'leaf.venation': [1, 0, 0],
     'phyllotaxis.pattern': [0.9, 0.1, 0, 0],
     // A bushy shrub: buds are suppressed about half the time and branches
@@ -199,7 +201,12 @@ export const DANDELION: SpeciesTemplate = {
   },
   distributions: {
     'leaf.form': [0.9, 0.1, 0, 0, 0],
-    'leaf.margin': [0, 0, 1, 0],
+    // The three traits the acceptance test turns on: a narrow blade that
+    // is widest above the middle, lobes that lean back toward the base, and
+    // no internode elongation at all.
+    'leaf.margin': [0, 0, 0, 0, 0, 0, 1],
+    'leaf.outline': [0, 0, 0, 0, 0, 0, 0, 1],
+    'habit.growth_form': [0, 1],
     'leaf.venation': [1, 0, 0],
     'phyllotaxis.pattern': [0.1, 0.05, 0.05, 0.8],
     // A dandelion has one scape and does not branch. Nearly total dominance.
@@ -240,7 +247,9 @@ export const SPEARMINT: SpeciesTemplate = {
   },
   distributions: {
     'leaf.form': [1, 0, 0, 0, 0],
-    'leaf.margin': [0, 1, 0, 0],
+    'leaf.margin': [0, 1, 0, 0, 0, 0, 0],
+    'leaf.outline': [0, 0, 1, 0, 0, 0, 0, 0],
+    'habit.growth_form': [1, 0],
     'leaf.venation': [1, 0, 0],
     'phyllotaxis.pattern': [0, 0.95, 0.05, 0],
     // A mint spreads by runners rather than branching much.
@@ -280,7 +289,9 @@ export const JACARANDA: SpeciesTemplate = {
   },
   distributions: {
     'leaf.form': [0, 0.05, 0.95, 0, 0],
-    'leaf.margin': [1, 0, 0, 0],
+    'leaf.margin': [1, 0, 0, 0, 0, 0, 0],
+    'leaf.outline': [1, 0, 0, 0, 0, 0, 0, 0],
+    'habit.growth_form': [1, 0],
     'leaf.venation': [1, 0, 0],
     'phyllotaxis.pattern': [0, 0.1, 0, 0.9],
     // A tree: a single trunk for metres before it forks, and branches that

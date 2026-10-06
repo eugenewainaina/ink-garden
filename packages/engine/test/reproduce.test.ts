@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createGenome, genomeId, type Genome } from '../src/genome.ts'
+import { GENOME_VERSION, createGenome, genomeId, type Genome } from '../src/genome.ts'
 import { LOCI, locusAt, locusIndex } from '../src/loci.ts'
 import { meiosis, mutateAllele, reproduce } from '../src/reproduce.ts'
 
@@ -142,7 +142,7 @@ describe('reproduce', () => {
     for (let i = 0; i < 40; i += 1) {
       const child = reproduce(`g-${i}`, a, b)
       expect(child.alleles.length).toBe(LOCI.length)
-      expect(child.version).toBe(1)
+      expect(child.version).toBe(GENOME_VERSION)
     }
   })
 })

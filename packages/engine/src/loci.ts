@@ -121,7 +121,7 @@ export const LOCI: readonly Locus[] = [
   q('branch.apical_dominance.b', 'branch.apical_dominance', 0.06),
 
   // Leaf
-  d('leaf.margin', ['entire', 'serrate', 'dentate', 'lobed'], 1, 'canalised'),
+  d('leaf.margin', ['entire', 'serrate', 'dentate', 'lobed', 'crenate', 'pinnatifid', 'runcinate'], 1, 'canalised'),
   d('leaf.venation', ['pinnate', 'palmate', 'parallel'], 1, 'canalised'),
   d('leaf.variegation', ['none', 'marginal', 'splashed', 'striped'], 0, 'homeotic', 0.004),
   d('leaf.pubescence', ['glabrous', 'pubescent'], 1, 'polymorphic'),
@@ -191,6 +191,40 @@ export const LOCI: readonly Locus[] = [
   d('lifecycle', ['annual', 'biennial', 'perennial'], 0, 'canalised'),
   q('allocation.root_shoot', 'allocation.root_shoot', 0.15),
   q('allocation.leaf_vs_stem', 'allocation.leaf_vs_stem', 0.15),
+
+  // --- Added in genome version 2. Appended, never inserted. ---
+  //
+  // Allele pairs are positional and allele index is the dominance series, so
+  // inserting a locus would silently change what every stored plant means.
+  // Everything new goes here, at the end, and migrateGenome fills the gap.
+  //
+  // Both references are chosen to mean "as before": an undeclared species is
+  // erect with an elliptic leaf, which is what it was before these loci
+  // existed. That is what lets a version 1 plant keep the appearance it had.
+
+  // Growth form. Canalised, because habit is what a species IS: a dandelion
+  // does not become a shrub by breeding. It can still shift by mutation, which
+  // is where ornamental sports come from.
+  d('habit.growth_form', ['erect', 'rosette'], 0, 'canalised'),
+
+  // Lamina outline. `elliptic` is the reference so the default is a plain leaf
+  // rather than an odd one. Terms are appended, so deltoid, reniform, sagittate
+  // and hastate can join later without disturbing anything.
+  d(
+    'leaf.outline',
+    [
+      'elliptic',
+      'orbicular',
+      'ovate',
+      'obovate',
+      'lanceolate',
+      'linear',
+      'spatulate',
+      'oblanceolate',
+    ],
+    0,
+    'canalised',
+  ),
 ]
 
 export const LOCUS_INDEX: ReadonlyMap<string, number> = new Map(
