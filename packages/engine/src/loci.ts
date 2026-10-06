@@ -225,6 +225,21 @@ export const LOCI: readonly Locus[] = [
     0,
     'canalised',
   ),
+
+  // --- Added in genome version 3. Appended, never inserted. ---
+  //
+  // The androecium and the gynoecium. These exist because the flower had petals
+  // and nothing else, and a flower with no stamens is not a complete flower. In
+  // two of these species the stamens are the obvious thing about it: a
+  // rosemary's protrude well past the corolla, and a mint has four.
+  //
+  // `included` is the reference for exsertion, so an undeclared species keeps
+  // its stamens inside the corolla, which is the more common arrangement.
+  q('stamen.count.a', 'stamen.count', 0.5),
+  q('stamen.count.b', 'stamen.count', 0.32),
+  d('stamen.exsertion', ['included', 'exserted'], 0, 'canalised'),
+  q('carpel.style.a', 'carpel.style', 0.45),
+  q('carpel.style.b', 'carpel.style', 0.3),
 ]
 
 export const LOCUS_INDEX: ReadonlyMap<string, number> = new Map(

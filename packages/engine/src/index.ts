@@ -59,6 +59,7 @@ export {
   express,
   expressMutable,
   expressPlant,
+  normalisedTrait,
   resolveDiscrete,
   type DiscreteTrait,
   type MutablePhenotype,

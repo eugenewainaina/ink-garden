@@ -1,7 +1,8 @@
-import type { Phenotype } from '../phenotype.ts'
+import { normalisedTrait, type Phenotype } from '../phenotype.ts'
 import type { SpeciesTemplate } from '../species.ts'
 import { LEAF_OUTLINES, leafOutline, type Point } from './leaf.ts'
 import type { ProjectedOrgan } from './layout.ts'
+import { POINTED_TAPER, ellipse, taperedStroke } from './stroke.ts'
 
 /**
  * Flower geometry.
@@ -39,6 +40,10 @@ const PETAL_MARGIN: Readonly<Record<string, string>> = {
 export interface FlowerColours {
   readonly petal: string
   readonly centre: string
+  /** Filaments, style and stigma: the reproductive organs. */
+  readonly organ: string
+  /** Anthers and the stigma tip, which are usually a different colour. */
+  readonly anther: string
 }
 
 /**
@@ -60,10 +65,14 @@ export function flowerShapes(
   const petals = Math.max(1, Math.round(phenotype.quantitative['petal.count'] ?? 5))
   const shapeTerm = phenotype.discrete['petal.shape']?.expressed[0] ?? 'rounded'
   const marginTerm = phenotype.discrete['petal.margin']?.expressed[0] ?? 'entire'
-  const outline = PETAL_OUTLINE[shapeTerm] ?? 'obovate'
+  // A capitulum's florets are LIGULES: strap-shaped, parallel-sided, ending in
+  // a flat toothed tip. The `linear` outline tapers to a point at both ends, so
+  // a dandelion drawn with it came out as a sea urchin. Spatulate is widest
+  // near the tip, which is the strap.
   const margin = PETAL_MARGIN[marginTerm] ?? 'entire'
 
   const isHead = inflorescence === 'head'
+  const outline = isHead ? 'spatulate' : (PETAL_OUTLINE[shapeTerm] ?? 'obovate')
   // A mint's corolla really is 2.5 mm, which on a 20 cm plant is a pixel. The
   // model keeps the true size and the DRAWING floors it, so a small flower
   // reads without the species lying about its dimensions.
@@ -76,7 +85,7 @@ export function flowerShapes(
   // and applying the strap aspect of `ligulate` twice made them needles a pixel
   // wide. The lobe width is therefore set here and the term's aspect is undone.
   const aspect = LEAF_OUTLINES[outline]?.aspect ?? 1
-  const petalWidth = (petalLength * (isHead ? 0.16 : 0.55)) / Math.max(0.1, aspect)
+  const petalWidth = (petalLength * (isHead ? 0.42 : 0.55)) / Math.max(0.1, aspect)
 
   const out: { points: readonly Point[]; fill: string }[] = []
   const centre = { x: organ.x, y: organ.y }
@@ -84,7 +93,10 @@ export function flowerShapes(
   // `petal.count` is a phenotype trait capped for drawing: a head can carry
   // hundreds of florets and drawing every one of them at this scale adds
   // nothing a hundred does not.
-  const drawn = Math.max(1, Math.min(isHead ? 64 : 12, petals))
+  // A capitulum reads as a disc because its ligules overlap heavily. Drawn as
+  // thin spikes that barely touch, a dandelion looks like a sea urchin, which
+  // is exactly what the first flower close-up showed.
+  const drawn = Math.max(1, Math.min(isHead ? 96 : 12, petals))
   const phase = (seed.length * 37) % 360
 
   for (let i = 0; i < drawn; i += 1) {
@@ -109,7 +121,7 @@ export function flowerShapes(
         margin,
         seed: `${seed}|petal|${i}`,
         // A petal curls; a ligule is flat.
-        curve: isHead ? 0.12 : 0.4,
+        curve: isHead ? 0.1 : 0.4,
       },
       14,
     ).map((point: Point) => ({
@@ -134,6 +146,71 @@ export function flowerShapes(
     }
     out.push({ points: disc, fill: colours.centre })
   }
+
+  // ---- The androecium and the gynoecium ----
+  //
+  // A flower with no stamens is not a complete flower, and in two of these
+  // species the stamens are the obvious thing about it: a rosemary's protrude
+  // well past the corolla, and a mint has four. They were missing entirely
+  // until the genome grew the loci for them.
+  // NORMALISED, not raw. A quantitative trait's stored value runs to the sum of
+  // its loci weights, which is 1.64 for stamen count, so using it directly gave
+  // a dandelion nine stamens where five is the family's number.
+  const stamens = Math.max(1, Math.round(2 + normalisedTrait(phenotype, 'stamen.count') * 4))
+  const exserted = (phenotype.discrete['stamen.exsertion']?.expressed[0] ?? 'included') === 'exserted'
+  const drawnStamens = Math.min(stamens, 8)
+
+  // Inside the corolla the reproductive column is short; outside it, it reaches
+  // past the petals, which is the whole visual difference between a rosemary
+  // and a jacaranda.
+  const organLength = petalLength * (exserted ? 1.05 : 0.6)
+  const organBase = { x: centre.x, y: centre.y }
+  const phase2 = phase + 30
+
+  for (let i = 0; i < drawnStamens; i += 1) {
+    const angle = phase2 + (i * 360) / drawnStamens
+    const radians = (angle * Math.PI) / 180
+    // The filament reaches, and the stamens SPLAY around the style rather than
+    // standing in a column. The first version varied only the horizontal term
+    // and pushed every tip up the vertical axis, which drew a rosemary's two
+    // stamens as one stack above the flower instead of a pair around the
+    // stigma. Radial in both terms is what a whorl of stamens is.
+    const tip = {
+      x: organBase.x + Math.sin(radians) * organLength * 0.72,
+      y: organBase.y + Math.cos(radians) * organLength * 0.72 + organLength * 0.28,
+    }
+    const centreline = [organBase, { x: (organBase.x + tip.x) / 2, y: (organBase.y + tip.y) / 2 }, tip]
+    // a filament is a thin tapered stroke
+    const filament = taperedStroke(centreline, POINTED_TAPER, Math.max(0.015, petalLength * 0.045))
+    if (filament.length >= 3) out.push({ points: filament, fill: colours.organ })
+
+    // the anther is a small body at the tip
+    const anther = ellipse(tip, Math.max(0.02, petalLength * 0.075), Math.max(0.02, petalLength * 0.05), 8)
+    out.push({ points: anther, fill: colours.anther })
+  }
+
+  // The style is a single column, usually longer than the stamens, since its
+  // job is to catch pollen rather than to shed it.
+  // A style is normally about as long as the stamens it stands among: its job
+  // is to catch pollen off them, not to tower over them. It is allowed a little
+  // more when exserted, which is when a stigma is held clear of the anthers.
+  const styleFraction = Math.max(0.35, Math.min(1.2, 0.55 + normalisedTrait(phenotype, 'carpel.style') * 0.6))
+  // Just clear of the anthers when exserted, well inside the corolla when not.
+  const styleLength = organLength * styleFraction * 0.92
+  const styleCentre = [
+    organBase,
+    { x: centre.x, y: centre.y + styleLength * 0.5 },
+    { x: centre.x, y: centre.y + styleLength },
+  ]
+  const style = taperedStroke(styleCentre, POINTED_TAPER, Math.max(0.02, petalLength * 0.055))
+  if (style.length >= 3) out.push({ points: style, fill: colours.organ })
+  const stigma = ellipse(
+    { x: centre.x, y: centre.y + styleLength },
+    Math.max(0.03, petalLength * 0.1),
+    Math.max(0.02, petalLength * 0.055),
+    8,
+  )
+  out.push({ points: stigma, fill: colours.anther })
 
   return out
 }

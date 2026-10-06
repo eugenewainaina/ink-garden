@@ -202,6 +202,11 @@ export const ROSEMARY: SpeciesTemplate = {
     'thorn.presence': [0.05, 0.95],
     'inflorescence.type': [0, 0, 0, 0, 0, 0, 0, 1],
     'flower.symmetry': [0, 1],
+    'stamen.count.a': [0.97, 0.03],
+    'stamen.count.b': [0.97, 0.03],
+    'stamen.exsertion': [0, 1],
+    'carpel.style.a': [0.2, 0.8],
+    'carpel.style.b': [0.2, 0.8],
     'petal.shape': [0, 0, 0.3, 0.7, 0],
     // Pale: an anthocyanidin identity sets the hue, and this sets how much of
     // it there is. Low intensity is what makes a violet corolla pale rather
@@ -263,6 +268,11 @@ export const DANDELION: SpeciesTemplate = {
     'thorn.presence': [1, 0],
     'inflorescence.type': [0.04, 0, 0, 0, 0, 0, 0.96, 0],
     'flower.symmetry': [1, 0],
+    'stamen.count.a': [0.3, 0.7],
+    'stamen.count.b': [0.3, 0.7],
+    'stamen.exsertion': [1, 0],
+    'carpel.style.a': [0.15, 0.85],
+    'carpel.style.b': [0.15, 0.85],
     'petal.shape': [0, 0, 0.2, 0.8, 0],
     'petal.margin': [0, 0, 0.3, 0.7],
     'pigment.anthocyanidin': [1, 0, 0, 0],
@@ -312,6 +322,11 @@ export const SPEARMINT: SpeciesTemplate = {
     'thorn.presence': [1, 0],
     'inflorescence.type': [0, 0.95, 0, 0, 0, 0, 0, 0.05],
     'flower.symmetry': [0, 1],
+    'stamen.count.a': [0.5, 0.5],
+    'stamen.count.b': [0.5, 0.5],
+    'stamen.exsertion': [0, 1],
+    'carpel.style.a': [0.45, 0.55],
+    'carpel.style.b': [0.45, 0.55],
     'petal.shape': [0, 0, 0.4, 0.6, 0],
     // A white corolla is near-absent anthocyanin. The frequency has to be
     // pushed harder than the 22 per cent a pale pink would suggest, because
@@ -369,6 +384,11 @@ export const JACARANDA: SpeciesTemplate = {
     'inflorescence.type': [0.05, 0, 0.05, 0.9, 0, 0, 0, 0],
     'flower.symmetry': [0, 1],
     'flower.throat': [0.1, 0.85, 0.05],
+    'stamen.count.a': [0.42, 0.58],
+    'stamen.count.b': [0.42, 0.58],
+    'stamen.exsertion': [1, 0],
+    'carpel.style.a': [0.3, 0.7],
+    'carpel.style.b': [0.3, 0.7],
     'petal.shape': [0, 0, 0, 0.2, 0.8],
     // The delphinidin branch, with copigment, is what makes jacaranda violet
     // rather than magenta. True blue stays out of reach without the pH shift.

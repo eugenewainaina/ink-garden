@@ -2,7 +2,7 @@ import { LOCI, locusAt, locusIndex, type Locus } from './loci.ts'
 import { hash32, pickWeighted, rngFrom } from './rng.ts'
 import { defaultDistribution, type SpeciesTemplate } from './species.ts'
 
-export const GENOME_VERSION = 2
+export const GENOME_VERSION = 3
 
 export type Allele = number
 

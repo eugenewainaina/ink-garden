@@ -205,7 +205,27 @@ export function sceneFromShoot(
     Math.min(1, (phenotype.quantitative['pigment.saturation'] ?? 0.5) + 0.2),
     Math.max(0.2, (phenotype.quantitative['pigment.lightness'] ?? 0.6) * 0.62),
   )
-  const colours = { petal: petalFill, centre: centreFill }
+  // The reproductive organs are a paler, yellower green than the foliage: a
+  // filament is not a leaf, and in most flowers it is close to white.
+  // Pale, but not invisible: a filament is close to white in most flowers, and
+  // at 1.7 times the leaf lightness it was the same colour as the paper and
+  // disappeared on every species.
+  const organFill = hsvToHex(
+    species.baseline.leafHue + 8,
+    Math.max(0.08, species.baseline.leafSaturation * 0.45),
+    Math.min(0.86, species.baseline.leafLightness * 1.42),
+  )
+  const antherFill = hsvToHex(
+    (phenotype.quantitative['pigment.hue'] ?? 40) + 18,
+    Math.max(0.15, (phenotype.quantitative['pigment.saturation'] ?? 0.5) * 0.7),
+    Math.min(0.9, (phenotype.quantitative['pigment.lightness'] ?? 0.6) * 1.15),
+  )
+  const colours = {
+    petal: petalFill,
+    centre: centreFill,
+    organ: organFill,
+    anther: antherFill,
+  }
   const outline = phenotype.discrete['leaf.outline']?.expressed[0] ?? 'elliptic'
   const margin = phenotype.discrete['leaf.margin']?.expressed[0] ?? 'entire'
   const leafForm = phenotype.discrete['leaf.form']?.expressed[0] ?? 'simple'
