@@ -262,7 +262,10 @@ export function expressPlant(
   // of them for the same height.
   phenotype.quantitative['internode.length'] =
     scaleAround(
-      INTERNODE_COEFFICIENT * Math.sqrt(Math.max(0, template.baseline.stature)),
+      // The expressed stature, matching shoot.ts. The trait is scaled by the
+      // species baseline in the loop above, so this is the baseline times the
+      // genome's own variation.
+      INTERNODE_COEFFICIENT * Math.sqrt(Math.max(0, phenotype.quantitative['height'] ?? 0)),
       normalised(phenotype, 'internode.length'),
     ) * Math.max(0.1, template.baseline.internodeScale)
 

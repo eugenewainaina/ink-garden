@@ -108,6 +108,12 @@ export function shootGeometry(
   // A dense species packs more nodes into the same stem, so the node count
   // rises as its internodes shorten. Otherwise packing leaves tightly would
   // just make the plant shorter.
+  // The plant's own stature, not the species baseline. `habit.height` is
+  // expressed on every plant and `shootGeometry` was reading the SPECIES
+  // value, so half the genome's contribution to size was computed and then
+  // discarded. A locus-consumption guard found it: forcing height to either
+  // extreme produced an identical drawing.
+  const stature = Math.max(0.05, phenotype.quantitative['height'] ?? species.baseline.stature)
   const packing = Math.max(0.1, species.baseline.internodeScale)
   // The number of phytomers a shoot makes is itself a quantitative trait, and
   // it is what makes one seedling leafier than another. Without it a rosette
@@ -116,7 +122,7 @@ export function shootGeometry(
   const phytomers = 0.7 + 0.6 * normalisedTrait(phenotype, 'branch.count')
   const nodes = Math.max(
     6,
-    Math.min(34, Math.round(((6 + species.baseline.stature * 1.3) / packing) * phytomers)),
+    Math.min(34, Math.round(((6 + stature * 1.3) / packing) * phytomers)),
   )
 
   // Branch angle runs from nearly upright to nearly horizontal. The lower bound
