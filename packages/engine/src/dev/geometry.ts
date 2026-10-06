@@ -109,7 +109,7 @@ function diameterOf(points: readonly Point[]): number {
   return Number.isFinite(minX) && maxX > minX ? maxX - minX : 0
 }
 
-function hsvToHex(hue: number, saturation: number, value: number): string {
+export function hsvToHex(hue: number, saturation: number, value: number): string {
   const h = ((hue % 360) + 360) % 360
   const s = Math.max(0, Math.min(1, saturation))
   const v = Math.max(0, Math.min(1, value))
@@ -220,11 +220,23 @@ export function sceneFromShoot(
     Math.max(0.15, (phenotype.quantitative['pigment.saturation'] ?? 0.5) * 0.7),
     Math.min(0.9, (phenotype.quantitative['pigment.lightness'] ?? 0.6) * 1.15),
   )
+  // The calyx is the outermost whorl: photosynthetic in most flowers, and so
+  // nearer the foliage than the corolla is. Rosemary's is described as darker
+  // and purplish, which is what a shift of the flower's own hue toward the leaf
+  // gives.
+  // Lighter than the foliage, not darker: a calyx is thin and backlit, and at
+  // 0.92 of the leaf lightness with the light model on top it came out black.
+  const calyxFill = hsvToHex(
+    species.baseline.leafHue - 4,
+    Math.max(0.1, species.baseline.leafSaturation * 0.7),
+    Math.min(0.85, species.baseline.leafLightness * 1.3),
+  )
   const colours = {
     petal: petalFill,
     centre: centreFill,
     organ: organFill,
     anther: antherFill,
+    calyx: calyxFill,
   }
   const outline = phenotype.discrete['leaf.outline']?.expressed[0] ?? 'elliptic'
   const margin = phenotype.discrete['leaf.margin']?.expressed[0] ?? 'entire'

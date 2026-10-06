@@ -44,6 +44,8 @@ export interface FlowerColours {
   readonly organ: string
   /** Anthers and the stigma tip, which are usually a different colour. */
   readonly anther: string
+  /** The calyx, behind the corolla. Green, or a darker shade of the flower. */
+  readonly calyx: string
 }
 
 /**
@@ -98,6 +100,62 @@ export function flowerShapes(
   // is exactly what the first flower close-up showed.
   const drawn = Math.max(1, Math.min(isHead ? 96 : 12, petals))
   const phase = (seed.length * 37) % 360
+
+  // ---- The calyx, behind everything ----
+  //
+  // The outermost whorl, and the first thing a bud shows. Every one of these
+  // species has one: rosemary's is purplish and downy, jacaranda's is
+  // narrow-campanulate, a mint's is five toothed, and a dandelion's involucre
+  // is the same cup of bracts beneath the head. Drawn first so the corolla
+  // covers its base, which is how a calyx sits.
+  const sepalCount = Math.max(2, Math.round(5 + normalisedTrait(phenotype, 'sepal.count') * 8))
+  const sepalFraction = 0.18 + normalisedTrait(phenotype, 'sepal.length') * 0.34
+  const sepalLength = petalLength * sepalFraction
+  const sepals = isHead ? Math.min(sepalCount, 16) : Math.min(sepalCount, 8)
+
+  // A calyx is a CUP first and a set of lobes second. Bean's gives rosemary a
+  // calyx that is "darker and purplish" but does not call it five free sepals;
+  // PlantNET calls jacaranda's "narrow-campanulate", a bell; a mint's is five
+  // TOOTHED, meaning a tube with teeth. Drawing free sepals radiating outward
+  // put black spikes between the petals on all three, which is not a calyx.
+  // On a HEAD the cup is not a calyx at all: it is the involucre, and it sits
+  // BENEATH the capitulum as the cup the florets stand in. Drawn at the centre
+  // it filled the disc with a green star, which is not what an involucre is.
+  const cupCentre = isHead
+    ? { x: centre.x, y: centre.y - petalLength * 0.42 }
+    : centre
+  const cupRadius = isHead ? petalLength * 0.62 : sepalLength * 0.78
+  const cup = ellipse(cupCentre, cupRadius, cupRadius * (isHead ? 0.5 : 0.77), 14)
+  out.push({ points: cup, fill: colours.calyx })
+
+  const phase0 = phase + 180 / sepals
+  for (let i = 0; i < sepals; i += 1) {
+    const radians = ((phase0 + (i * 360) / sepals) * Math.PI) / 180
+    const outward = { x: Math.sin(radians), y: Math.cos(radians) }
+    // The lobes are short teeth at the rim of the cup, which is what shows
+    // beyond the corolla on a mint and what a bud is closed by.
+    const lobeLength = isHead ? petalLength * 0.5 : sepalLength * 0.85
+    const lobe = leafOutline(
+      {
+        length: lobeLength,
+        width: Math.max(0.015, lobeLength * (isHead ? 0.34 : 0.3)),
+        outline: 'lanceolate',
+        margin: 'entire',
+        seed: `${seed}|sepal|${i}`,
+        curve: 0.5,
+      },
+      6,
+    ).map((point: Point) => ({
+      // On a head the bracts splay out and down from the base of the cup.
+      x: cupCentre.x + outward.x * lobeLength * 0.42 + point.x * Math.cos(radians) + point.y * outward.x,
+      y:
+        cupCentre.y +
+        outward.y * lobeLength * 0.28 -
+        point.x * Math.sin(radians) +
+        point.y * outward.y,
+    }))
+    if (lobe.length >= 3) out.push({ points: lobe, fill: colours.calyx })
+  }
 
   for (let i = 0; i < drawn; i += 1) {
     // A corolla is symmetric about the flower's axis; a head's florets all

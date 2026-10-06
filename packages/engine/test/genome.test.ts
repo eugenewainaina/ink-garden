@@ -129,16 +129,16 @@ function allelesOf(g: Genome): number[][] {
 
 describe('genome versioning and migration', () => {
   it('is at the version the added loci require', () => {
-    // Bumped to 2 when habit.growth_form and leaf.outline were appended, and to
-    // 3 when the androecium and gynoecium were.
-    expect(GENOME_VERSION).toBe(3)
+    // Bumped to 2 for habit and leaf outline, 3 for the androecium and
+    // gynoecium, and 4 for the calyx.
+    expect(GENOME_VERSION).toBe(4)
   })
 
   it('migrates a version 1 genome by padding, never by rewriting', () => {
     // A version 1 genome is a shorter positional array. Migration must append
     // and must leave every existing locus byte-identical, or a plant the user
     // has known for a year becomes a different plant.
-    const before = LOCI.length - 7
+    const before = LOCI.length - 11
     const old = createGenome(
       Array.from({ length: before }, (_, i) => {
         const locus = LOCI[i]
@@ -161,13 +161,17 @@ describe('genome versioning and migration', () => {
       LOCI.map((locus) => {
         const count = locus.kind === 'discrete' ? locus.alleles.length : 2
         return [0, Math.min(1, count - 1)] as const
-      }).slice(0, LOCI.length - 7),
+      }).slice(0, LOCI.length - 11),
     )
     const migrated = migrateGenome({ version: 1, alleles: old.alleles })
 
     // Discrete loci pad with their reference ALLELE, which is what keeps a
     // migrated plant looking as it did.
-    for (const id of ['habit.growth_form', 'leaf.outline', 'stamen.exsertion']) {
+    for (const id of [
+      'habit.growth_form',
+      'leaf.outline',
+      'stamen.exsertion',
+    ]) {
       const locus = locusById(id)
       if (locus.kind !== 'discrete') throw new Error('expected discrete')
       const reference = locus.referenceAllele ?? 0
@@ -185,6 +189,10 @@ describe('genome versioning and migration', () => {
       'stamen.count.b',
       'carpel.style.a',
       'carpel.style.b',
+      'sepal.count.a',
+      'sepal.count.b',
+      'sepal.length.a',
+      'sepal.length.b',
     ]) {
       const locus = locusById(id)
       if (locus.kind !== 'quantitative') throw new Error('expected quantitative')

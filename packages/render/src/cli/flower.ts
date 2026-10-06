@@ -2,6 +2,7 @@ import { SPECIES, expressPlant, founderGenome, normalisedTrait } from '@ink-gard
 import type { ProjectedOrgan } from '@ink-garden/engine'
 import { flowerShapes } from '../../../engine/src/dev/flower.ts'
 import { toSvg } from '../index.ts'
+import { hsvToHex } from '../../../engine/src/dev/geometry.ts'
 
 /**
  * One flower, large.
@@ -42,11 +43,22 @@ const organ: ProjectedOrgan = {
   facing: 1,
 }
 
+// Derived the way the plant derives them, so the inspector cannot drift from
+// what a plant actually draws. It had its own hardcoded set and no `calyx` key,
+// so the calyx rendered as fill="undefined" - which is black, and looked
+// exactly like a colour bug in the engine.
+const hue = phenotype.quantitative['pigment.hue'] ?? 300
+const sat = phenotype.quantitative['pigment.saturation'] ?? 0.5
+const light = phenotype.quantitative['pigment.lightness'] ?? 0.6
+const leafHue = species.baseline.leafHue
+const leafSat = species.baseline.leafSaturation
+const leafLight = species.baseline.leafLightness
 const colours = {
-  petal: '#8e5aa8',
-  centre: '#6d3f86',
-  organ: '#e8e4d0',
-  anther: '#c8a23c',
+  petal: hsvToHex(hue, sat, light),
+  centre: hsvToHex(hue - 12, Math.min(1, sat + 0.1), Math.max(0.15, light * 0.78)),
+  organ: hsvToHex(leafHue + 8, Math.max(0.08, leafSat * 0.45), Math.min(0.86, leafLight * 1.42)),
+  anther: hsvToHex(hue + 18, Math.max(0.15, sat * 0.7), Math.min(0.9, light * 1.15)),
+  calyx: hsvToHex(leafHue - 4, Math.max(0.1, leafSat * 0.7), Math.min(0.85, leafLight * 1.3)),
 }
 const parts = flowerShapes(organ, phenotype, inflorescence, colours, 'inspector')
 

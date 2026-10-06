@@ -240,6 +240,18 @@ export const LOCI: readonly Locus[] = [
   d('stamen.exsertion', ['included', 'exserted'], 0, 'canalised'),
   q('carpel.style.a', 'carpel.style', 0.45),
   q('carpel.style.b', 'carpel.style', 0.3),
+
+  // --- Added in genome version 4. Appended, never inserted. ---
+  //
+  // The calyx. Every one of these species has one and none of them was drawn:
+  // Bean's gives rosemary a calyx that is "darker and purplish, very downy",
+  // PlantNET gives jacaranda a "narrow-campanulate" one, a mint's is five
+  // toothed, and a dandelion's involucre is the same cup of bracts under the
+  // head. It is the outermost whorl and the first thing a bud shows.
+  q('sepal.count.a', 'sepal.count', 0.5),
+  q('sepal.count.b', 'sepal.count', 0.3),
+  q('sepal.length.a', 'sepal.length', 0.4),
+  q('sepal.length.b', 'sepal.length', 0.25),
 ]
 
 export const LOCUS_INDEX: ReadonlyMap<string, number> = new Map(
