@@ -1,4 +1,4 @@
-import type { Locus } from './loci.ts'
+import { LOCI, type Locus } from './loci.ts'
 
 export type Lifecycle = 'annual' | 'biennial' | 'perennial'
 
@@ -281,7 +281,7 @@ export const SPEARMINT: SpeciesTemplate = {
     stature: 2,
     leafSize: 2.5,
     internodeScale: 0.8,
-    leafAspect: 2,
+    leafAspect: 4.5,
     leafHue: 100,
     leafSaturation: 0.48,
     leafLightness: 0.54,
@@ -304,7 +304,7 @@ export const SPEARMINT: SpeciesTemplate = {
     'branch.apical_dominance.b': [0.15, 0.85],
     'stem.pigment': [1, 0],
     'thorn.presence': [1, 0],
-    'inflorescence.type': [0.05, 0.35, 0.55, 0.05, 0, 0, 0, 0],
+    'inflorescence.type': [0, 0.95, 0, 0, 0, 0, 0, 0.05],
     'flower.symmetry': [0, 1],
     'petal.shape': [0, 0, 0.4, 0.6, 0],
     'pigment.anthocyanidin': [0.1, 0.6, 0.25, 0.05],
@@ -376,3 +376,32 @@ export const SPECIES: readonly SpeciesTemplate[] = [
   SPEARMINT,
   JACARANDA,
 ]
+
+/**
+ * The normalised value a species' own distribution expects for a quantitative
+ * trait.
+ *
+ * A species declares the FREQUENCY of each allele; this reads back the trait
+ * value that follows, so the genome can vary around the species' centre rather
+ * than around the middle of the whole possible range. The distinction matters:
+ * two loci of equal weight give a normalised value of 0, 0.25, 0.5, 0.75 or 1,
+ * and used raw that spread a rosemary's branching from 2 per cent of buds to
+ * 92, which is a thicket at one extreme and a bare pole at the other.
+ */
+export function expectedNormalised(template: SpeciesTemplate, trait: string): number {
+  let weight = 0
+  let expected = 0
+  for (const locus of LOCI) {
+    if (locus.kind !== 'quantitative' || locus.trait !== trait) continue
+    const distribution = template.distributions[locus.id] ?? defaultDistribution(locus)
+    let allele = 0
+    for (let i = 0; i < distribution.length; i += 1) {
+      allele += i * (distribution[i] ?? 0)
+    }
+    // Both copies are drawn independently, so the pair expects twice the mean.
+    expected += locus.weight * 2 * allele
+    weight += locus.weight * 2
+  }
+  if (weight <= 0) return 0.5
+  return Math.max(0, Math.min(1, expected / weight))
+}

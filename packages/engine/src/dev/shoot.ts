@@ -1,5 +1,5 @@
 import { normalisedTrait, type Phenotype } from '../phenotype.ts'
-import type { SpeciesTemplate } from '../species.ts'
+import { expectedNormalised, type SpeciesTemplate } from '../species.ts'
 import type { Phyllotaxis } from './phyllotaxis.ts'
 
 /** Everything the meristem needs to build a shoot, in physical units. */
@@ -41,6 +41,34 @@ export function growthFormOf(phenotype: Phenotype): GrowthForm {
 const PATTERNS: readonly Phyllotaxis[] = ['alternate', 'decussate', 'whorled', 'spiral']
 
 /**
+ * How much of the genome's full range survives, once the species has set the
+ * centre.
+ *
+ * Real within-species variation in a trait like apical dominance is a modest
+ * band around a species typical value, not the whole interval. Four tenths
+ * keeps a plant recognisably its species while still giving seedlings
+ * individual character.
+ */
+const GENOME_SPREAD = 0.4
+
+/**
+ * A trait value pulled in toward the species' own expectation.
+ *
+ * The genome keeps its deviation from the species centre, scaled down; what it
+ * loses is the ability to sit at a mathematical extreme the species never
+ * occupies.
+ */
+function aroundSpeciesCentre(
+  species: SpeciesTemplate,
+  phenotype: Phenotype,
+  trait: string,
+): number {
+  const centre = expectedNormalised(species, trait)
+  const value = normalisedTrait(phenotype, trait)
+  return Math.max(0, Math.min(1, centre + (value - centre) * GENOME_SPREAD))
+}
+
+/**
  * Turn a phenotype into meristem parameters.
  *
  * This layer exists because of a units bug worth recording. `branch.angle` and
@@ -73,9 +101,14 @@ export function shootGeometry(
   // rises as its internodes shorten. Otherwise packing leaves tightly would
   // just make the plant shorter.
   const packing = Math.max(0.1, species.baseline.internodeScale)
+  // The number of phytomers a shoot makes is itself a quantitative trait, and
+  // it is what makes one seedling leafier than another. Without it a rosette
+  // came out with exactly the same leaf count every time, which is as unlike a
+  // species as a nine-fold spread is.
+  const phytomers = 0.7 + 0.6 * normalisedTrait(phenotype, 'branch.count')
   const nodes = Math.max(
     6,
-    Math.min(34, Math.round((6 + species.baseline.stature * 1.3) / packing)),
+    Math.min(34, Math.round(((6 + species.baseline.stature * 1.3) / packing) * phytomers)),
   )
 
   // Branch angle runs from nearly upright to nearly horizontal. The lower bound
@@ -95,7 +128,7 @@ export function shootGeometry(
   // pieces to 14,000. A trunk that keeps nine tenths of its buds suppressed is
   // the whole reason a tree has a trunk, so the upper end has to stay within
   // reach.
-  const dominance = 0.08 + normalisedTrait(phenotype, 'branch.apical_dominance') * 0.9
+  const dominance = 0.08 + aroundSpeciesCentre(species, phenotype, 'branch.apical_dominance') * 0.9
 
   const form = growthFormOf(phenotype)
   // A rosette leaf leaves the crown rising steeply and then arches out, so

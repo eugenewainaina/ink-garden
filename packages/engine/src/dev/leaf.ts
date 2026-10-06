@@ -329,18 +329,30 @@ const RACHIS_WIDTH = 0.05
  */
 export function leafDecomposition(
   form: string,
-  pairs = 4,
+  options: { readonly pinnae?: number; readonly pinnules?: number } = {},
 ): readonly LaminaPlacement[] {
   if (form !== 'pinnate' && form !== 'bipinnate') return SIMPLE
 
-  const sidePairs = Math.max(2, Math.min(8, Math.round(pairs)))
+  // Counts from the floras. PlantNET gives Jacaranda mimosifolia "pinnae (6-)10-20
+  // pairs... pinnules (6-)12-24 pairs", so a single leaf carries a few hundred
+  // leaflets and the foliage is mostly air. A first version used four of each,
+  // which drew a jacaranda as sixteen fat leaflets and read as a solid slab.
+  const bipinnate = form === 'bipinnate'
+  const sidePairs = Math.max(2, Math.min(20, Math.round(options.pinnae ?? (bipinnate ? 12 : 6))))
   const placements: LaminaPlacement[] = [
     { offset: { x: 0, y: 0 }, angle: 0, scale: 1, widthFactor: RACHIS_WIDTH },
   ]
 
-  const spread = form === 'bipinnate' ? 46 : 56
-  const rachisScale = form === 'bipinnate' ? 0.46 : 0.36
-  const leafletsPerRachis = 4
+  const spread = bipinnate ? 46 : 56
+  // Pinna and pinnule sizes as fractions of the whole leaf, from the flora.
+  // PlantNET gives a jacaranda leaf as 15 to 33 cm with pinnae 2.5 to 10 cm and
+  // pinnules 3 to 12 mm, so a pinna is about a quarter of the leaf and a pinnule
+  // about a twentieth. A first attempt used 0.46 and 0.15, which drew each
+  // pinnule three times too long and merged twenty thousand of them into one
+  // solid green mass.
+  const rachisScale = bipinnate ? 0.25 : 0.36
+  const pinnuleScale = 0.05
+  const leafletsPerRachis = Math.max(2, Math.min(24, Math.round(options.pinnules ?? 12)))
 
   for (let i = 0; i < sidePairs; i += 1) {
     const t = (i + 1) / (sidePairs + 1)
@@ -366,10 +378,12 @@ export function leafDecomposition(
       for (let j = 0; j < leafletsPerRachis; j += 1) {
         const u = (j + 1) / (leafletsPerRachis + 1)
         placements.push({
-          offset: { x: dx * u, y: t + dy * u },
+          // Clamped to the leaf: with a dozen pinnae the apical ones would
+          // otherwise overshoot the apex and dangle past the blade.
+          offset: { x: dx * u, y: Math.min(1, t + dy * u) },
           angle: rachisAngle + side * 40,
-          scale: 0.15,
-          widthFactor: 0.42,
+          scale: pinnuleScale,
+          widthFactor: 0.6,
         })
       }
     }
