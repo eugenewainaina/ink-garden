@@ -96,6 +96,25 @@ export const DERIVED_TRAITS: Readonly<Record<string, number>> = {
  */
 export const MAX_PETIOLE_FRACTION = 0.35
 
+/**
+ * How hard allocation pulls stem against lamina.
+ *
+ * At 0.55 a plant allocating everything to lamina stands on internodes little
+ * over half as long as one at the other end, carrying the same lamina on far
+ * less stem. That is a visible difference and the sort a real species shows
+ * between a shaded individual and an exposed one.
+ */
+const ALLOCATION_LEAF_BIAS = 0.55
+
+/**
+ * How hard allocation pulls shoot against root.
+ *
+ * Smaller than the leaf-and-stem pull on purpose. A plant can be very leafy or
+ * very woody and still recognisable; one that has put almost nothing above
+ * ground is a different object.
+ */
+const ALLOCATION_ROOT_BIAS = 0.2
+
 /** How far a quantitative trait may move from its species baseline. */
 export const BASELINE_SPREAD = 0.5
 
@@ -238,6 +257,44 @@ export function expressPlant(
     )
   }
 
+  // Internode length: the allometric relation with stature, then the species'
+  // own packing density. A dense shrub has short internodes and therefore many
+  // of them for the same height.
+  phenotype.quantitative['internode.length'] =
+    scaleAround(
+      INTERNODE_COEFFICIENT * Math.sqrt(Math.max(0, template.baseline.stature)),
+      normalised(phenotype, 'internode.length'),
+    ) * Math.max(0.1, template.baseline.internodeScale)
+
+  // ---- Allocation ----
+  //
+  // A plant does not have an unlimited budget. It fixes carbon and divides it
+  // between roots, stems and leaves, and that division is what its proportions
+  // ARE. Both allocation traits have been in the genome from the beginning and
+  // neither was read.
+  //
+  // Allocation moves the STEM and leaves the LEAF where the flora put it, and
+  // that asymmetry is deliberate. A leaf's dimensions come from a flora, and a
+  // first version scaled the leaf as well: a jacaranda then spanned 6.5 to 75 cm
+  // against PlantNET's 15 to 33, because the leaf-length locus already fills
+  // that range on its own and allocation compounded with it. A plant is leafy
+  // because it carries the same lamina on LESS stem, so the ratio is expressed
+  // through the stem and the measurement stands.
+  {
+    const bias = (normalised(phenotype, 'allocation.leaf_vs_stem') - 0.5) * 2
+    // More to lamina means less to stem, and a shorter stem carries the same
+    // leaf area.
+    const stemScale = Math.max(0.25, 1 - bias * ALLOCATION_LEAF_BIAS)
+    // Root allocation is a sink this engine does not draw, and its cost is real
+    // all the same: what goes below ground does not extend above it, which is
+    // what makes a high root-to-shoot plant compact rather than small-leaved.
+    const rootBias = (normalised(phenotype, 'allocation.root_shoot') - 0.5) * 2
+    const shootScale = Math.max(0.25, 1 - rootBias * ALLOCATION_ROOT_BIAS)
+
+    phenotype.quantitative['internode.length'] =
+      (phenotype.quantitative['internode.length'] ?? 0) * stemScale * shootScale
+  }
+
   // Width follows from length and the species' proportions, with the genome
   // varying the aspect around the species value rather than setting the width
   // directly. This is what lets a dandelion be four times longer than wide
@@ -257,14 +314,6 @@ export function expressPlant(
     normalised(phenotype, 'leaf.petiole') *
     MAX_PETIOLE_FRACTION
 
-  // Internode length: the allometric relation with stature, then the species'
-  // own packing density. A dense shrub has short internodes and therefore many
-  // of them for the same height.
-  phenotype.quantitative['internode.length'] =
-    scaleAround(
-      INTERNODE_COEFFICIENT * Math.sqrt(Math.max(0, template.baseline.stature)),
-      normalised(phenotype, 'internode.length'),
-    ) * Math.max(0.1, template.baseline.internodeScale)
 
   const canalised =
     phenotype.discrete['flower.canalisation']?.expressed[0] === 'canalised'
