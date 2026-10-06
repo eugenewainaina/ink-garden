@@ -220,6 +220,8 @@ export const ROSEMARY: SpeciesTemplate = {
     'pigment.intensity.a': [0.94, 0.06],
     'pigment.intensity.b': [0.94, 0.06],
     'pigment.intensity.c': [0.94, 0.06],
+    // Plain-flowered: the variants are rare sports, which is the point of breeding.
+    'pigment.pattern': [0.92, 0.02, 0.03, 0.02, 0.01],
     'pigment.anthocyanidin': [0.05, 0.1, 0.25, 0.6],
     'pigment.carotenoid': [1, 0, 0, 0],
     'photoperiod.response': [0.3, 0.4, 0.3],
@@ -287,6 +289,8 @@ export const DANDELION: SpeciesTemplate = {
     'carpel.style.b': [0.15, 0.85],
     'petal.shape': [0, 0, 0.2, 0.8, 0],
     'petal.margin': [0, 0, 0.3, 0.7],
+    // Plain-flowered: the variants are rare sports, which is the point of breeding.
+    'pigment.pattern': [0.94, 0.02, 0.02, 0.01, 0.01],
     'pigment.anthocyanidin': [1, 0, 0, 0],
     'pigment.carotenoid': [0.05, 0.85, 0.1, 0],
     'photoperiod.response': [0.7, 0.2, 0.1],
@@ -353,6 +357,8 @@ export const SPEARMINT: SpeciesTemplate = {
     // series, and dominance is a property of the locus rather than of the
     // species. A species that needs the normal state to dominate cannot say
     // so, which is a real limitation of the model and not just of this line.
+    // Plain-flowered: the variants are rare sports, which is the point of breeding.
+    'pigment.pattern': [0.92, 0.02, 0.02, 0.02, 0.02],
     'pigment.anthocyanidin': [0.97, 0.03, 0, 0],
     'pigment.carotenoid': [1, 0, 0, 0],
     'photoperiod.response': [0.2, 0.3, 0.5],
@@ -416,6 +422,8 @@ export const JACARANDA: SpeciesTemplate = {
     'petal.shape': [0, 0, 0, 0.2, 0.8],
     // The delphinidin branch, with copigment, is what makes jacaranda violet
     // rather than magenta. True blue stays out of reach without the pH shift.
+    // Plain-flowered: the variants are rare sports, which is the point of breeding.
+    'pigment.pattern': [0.9, 0.03, 0.03, 0.02, 0.02],
     'pigment.anthocyanidin': [0.02, 0.03, 0.05, 0.9],
     'pigment.carotenoid': [1, 0, 0, 0],
     'pigment.copigment.a': [0.15, 0.85],

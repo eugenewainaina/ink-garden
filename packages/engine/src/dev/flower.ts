@@ -49,6 +49,10 @@ export interface FlowerColours {
   readonly calyx: string
   /** A ripe achene body: cream to greenish brown. */
   readonly seed: string
+  /** A paler shade of the petal, for a picotee rim or a gradient. */
+  readonly petalPale: string
+  /** A deeper shade, for the blotch at the base of a petal. */
+  readonly petalDeep: string
 }
 
 /**
@@ -78,6 +82,11 @@ export function flowerShapes(
   const margin = PETAL_MARGIN[marginTerm] ?? 'entire'
 
   const isHead = inflorescence === 'head'
+  // `pigment.pattern` has been a locus since the beginning and nothing drew it,
+  // so a picotee or a blotched flower came out plain. It is a real pattern and
+  // a classic breeding goal, which is why it belongs in a garden rather than in
+  // a list of unused loci.
+  const pattern = phenotype.discrete['pigment.pattern']?.expressed[0] ?? 'solid'
   // The ABC model decides what each of the four whorls BECOMES. `identity.ts`
   // has resolved this since the beginning and nothing called it, so the two
   // homeotic mutations it exists for were expressed on every plant and drawn on
@@ -326,7 +335,47 @@ export function flowerShapes(
       y: base.y - point.x * Math.sin(radians) + point.y * outward.y,
     }))
 
-    if (local.length >= 3) out.push({ points: local, fill: colours.petal })
+    if (local.length < 3) continue
+    out.push({ points: local, fill: colours.petal })
+
+    // The pattern, drawn as a mark ON the petal rather than as a different
+    // petal: a picotee is a pale blade with a coloured rim, so the pale part is
+    // a smaller petal on top.
+    const scaled = (factor: number): Point[] =>
+      local.map((point: Point) => ({
+        x: base.x + (point.x - base.x) * factor,
+        y: base.y + (point.y - base.y) * factor,
+      }))
+    if (pattern === 'gradient') {
+      out.push({ points: scaled(0.55), fill: colours.petalPale })
+    } else if (pattern === 'picotee') {
+      out.push({ points: scaled(0.82), fill: colours.petalPale })
+    } else if (pattern === 'blotch') {
+      // Sized off the petal LENGTH. `petalWidth` here is the width before the
+      // outline's own aspect narrows it, so a blotch scaled from it came out
+      // almost as large as the petal it sits on.
+      out.push({
+        points: ellipse(base, petalLength * 0.17, petalLength * 0.09, 8),
+        fill: colours.petalDeep,
+      })
+    } else if (pattern === 'speckled') {
+      for (let d = 0; d < 3; d += 1) {
+        const along = 0.3 + d * 0.22
+        const across = (d % 2 === 0 ? 1 : -1) * petalLength * 0.05
+        out.push({
+          points: ellipse(
+            {
+              x: base.x + outward.x * petalLength * along + Math.cos(radians) * across,
+              y: base.y + outward.y * petalLength * along - Math.sin(radians) * across,
+            },
+            petalLength * 0.055,
+            petalLength * 0.055,
+            6,
+          ),
+          fill: colours.petalDeep,
+        })
+      }
+    }
   }
 
   // The centre of a head is the disc of florets, which reads darker.

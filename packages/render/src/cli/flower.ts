@@ -4,6 +4,7 @@ import { flowerShapes } from '../../../engine/src/dev/flower.ts'
 import { toSvg } from '../index.ts'
 import { plantPalette } from '../../../engine/src/dev/geometry.ts'
 import { setAlleleByName } from '../../../engine/test/helpers.ts'
+import { LOCI } from '../../../engine/src/loci.ts'
 
 /**
  * One flower, large.
@@ -31,6 +32,12 @@ let genome = founderGenome(species, args['seed'] ?? 'flower')
 // and why forcing them is the only way to check the drawing.
 if (args['double'] === 'true') {
   genome = setAlleleByName(genome, 'flower.doubling', 'double', 'double')
+}
+if (args['pattern'] !== undefined) {
+  const locus = LOCI.find((l) => l.id === 'pigment.pattern')
+  if (locus?.kind === 'discrete') {
+    genome = setAlleleByName(genome, 'pigment.pattern', args['pattern'], args['pattern'])
+  }
 }
 if (args['petaloid'] === 'true') {
   genome = setAlleleByName(genome, 'flower.organ.identity', 'sepals.petaloid', 'sepals.petaloid')

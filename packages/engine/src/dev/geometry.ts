@@ -209,6 +209,19 @@ const colours = {
     Math.max(0.12, species.baseline.leafSaturation * 0.5),
     Math.min(0.62, species.baseline.leafLightness * 1.35),
   ),
+  // A picotee's rim is the petal colour and its centre is paler; a blotch is
+  // deeper than the blade. Both are shades of the same pigment rather than
+  // different pigments, which is what a pattern is.
+  petalPale: hsvToHex(
+    (phenotype.quantitative['pigment.hue'] ?? 40) + 6,
+    Math.max(0.03, (phenotype.quantitative['pigment.saturation'] ?? 0.5) * 0.35),
+    Math.min(0.96, (phenotype.quantitative['pigment.lightness'] ?? 0.6) * 1.5),
+  ),
+  petalDeep: hsvToHex(
+    (phenotype.quantitative['pigment.hue'] ?? 40) - 10,
+    Math.min(1, (phenotype.quantitative['pigment.saturation'] ?? 0.5) * 1.15),
+    Math.max(0.12, (phenotype.quantitative['pigment.lightness'] ?? 0.6) * 0.6),
+  ),
 }
   return colours
 }
