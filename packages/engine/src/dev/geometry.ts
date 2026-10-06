@@ -1,4 +1,4 @@
-import type { Phenotype } from '../phenotype.ts'
+import { normalisedTrait, type Phenotype } from '../phenotype.ts'
 import type { SpeciesTemplate } from '../species.ts'
 import { leafDecomposition, leafOutline, leafVeins, type Point } from './leaf.ts'
 import { DEFAULT_TILT_DEG, placeOrgans, projectOrgans } from './layout.ts'
@@ -97,6 +97,38 @@ function shadeHex(hex: string, factor: number): string {
       .toString(16)
       .padStart(2, '0')
   return `#${channel(16)}${channel(8)}${channel(0)}`
+}
+
+/**
+ * How far a leaf has aged, from 0 at the tip to 1 at the base.
+ *
+ * A shoot's leaves are not contemporary. The ones near the base unfolded first
+ * and are the oldest, and chlorophyll in an old leaf breaks down before the
+ * carotenoids do, which is why a senescing leaf turns yellow and then brown
+ * rather than simply fading. `senescence.rate` has been a locus since the
+ * beginning and nothing read it, so a plant looked the same in June and
+ * October.
+ */
+function leafAge(height: number, tallest: number): number {
+  if (tallest <= 0) return 0
+  return Math.max(0, Math.min(1, 1 - height / tallest))
+}
+
+/** Shift a colour toward another hue, taking the short way round the wheel. */
+function shiftHue(
+  hue: number,
+  saturation: number,
+  lightness: number,
+  targetHue: number,
+  amount: number,
+): { readonly hue: number; readonly saturation: number; readonly lightness: number } {
+  const t = Math.max(0, Math.min(1, amount))
+  const delta = ((targetHue - hue + 540) % 360) - 180
+  return {
+    hue: (hue + delta * t + 360) % 360,
+    saturation: saturation * (1 - 0.25 * t) + 0.55 * t,
+    lightness: lightness + (0.68 - lightness) * t * 0.8,
+  }
 }
 
 function diameterOf(points: readonly Point[]): number {
@@ -281,6 +313,7 @@ export function sceneFromShoot(
     Math.min(1, species.baseline.leafSaturation + 0.2),
     Math.max(0.1, species.baseline.leafLightness * 0.62),
   )
+  const senescenceRate = normalisedTrait(phenotype, 'senescence.rate')
   const veinFill = hsvToHex(
     species.baseline.leafHue + 4,
     Math.max(0, species.baseline.leafSaturation * 0.6),
@@ -480,7 +513,27 @@ export function sceneFromShoot(
         if (local.length < 3) continue
         const points = local.map(place)
         for (const point of points) include(point)
-        const blade = lit ? shadeHex(leafFill, shade) : leafFill
+        // Age the blade. A young leaf at the tip is fresher and a little
+        // yellower; once the plant has set seed the oldest leaves go over,
+        // which is what `senescence.rate` is for.
+        const age = leafAge(organ.y, tallest)
+        const young = Math.max(0, 1 - age * 2)
+        // A senescence rate of nought means the species holds its colour, which
+        // is what a dandelion and a mint do. A rate of one takes the oldest
+        // leaves most of the way to yellow before the plant drops them.
+        const senescing =
+          shoot.flowerStage === 'seed' ? Math.min(0.9, age * senescenceRate * 1.9) : 0
+        const aged = shiftHue(
+          species.baseline.leafHue,
+          species.baseline.leafSaturation,
+          species.baseline.leafLightness,
+          // Chlorophyll goes first and leaves the carotenoids: yellow, then
+          // brown at the far end.
+          44,
+          Math.max(young * 0.1, senescing),
+        )
+        const bladeFill = hsvToHex(aged.hue, aged.saturation, aged.lightness)
+        const blade = lit ? shadeHex(bladeFill, shade) : bladeFill
         shapes.push({ role: 'leaf', points, fill: blade })
         // A drawn leaf has a defined edge. Without one the blade is a flat
         // silhouette, which is what made the whole plant read as a diagram: ink
