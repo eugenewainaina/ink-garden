@@ -1,7 +1,12 @@
 import type { Phenotype } from '../phenotype.ts'
 import type { SpeciesTemplate } from '../species.ts'
 import { dayLengthHours } from './solar.ts'
-import { accumulateThermal, type ThermalState } from './thermal.ts'
+import {
+  advanceThermal,
+  EMPTY_THERMAL,
+  upperThresholdC,
+  type ThermalState,
+} from './thermal.ts'
 import type { WeatherDay } from './weather.ts'
 
 export type Stage =
@@ -147,20 +152,14 @@ export function phenologyOver(
   latitudeDeg: number,
 ): Phenology {
   const base = phenotype.quantitative['thermal.base_temp'] ?? species.baseline.thermalBase
-  const upper = base + 30
+  const upper = upperThresholdC(base)
 
   let best: Phenology = { stage: 'germination', progress: 0 }
-  let accumulated = 0
-  let chilledHours = 0
+  let thermal: ThermalState = EMPTY_THERMAL
 
   for (const day of series) {
-    accumulated +=
-      Math.max(0, Math.min(upper - base, (day.tMinC + day.tMaxC) / 2 - base))
-    const span = day.tMaxC - day.tMinC
-    if (day.tMaxC <= 5) chilledHours += 24
-    else if (day.tMinC < 5 && span > 0) chilledHours += 24 * ((5 - day.tMinC) / span)
-
-    const thermal: ThermalState = { accumulated, days: 1, chilledHours }
+    // One day at a time, through the thermal module. Never re-implemented here.
+    thermal = advanceThermal(thermal, day, base, upper)
     const here = phenologyAt(
       thermal,
       phenotype,

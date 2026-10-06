@@ -1,5 +1,26 @@
 import type { WeatherDay } from './weather.ts'
 
+/**
+ * The default temperature below which time counts as chilling.
+ *
+ * Named rather than repeated, because it was previously written as a literal 5
+ * in two modules and the second copy is exactly the kind of thing that diverges.
+ */
+export const DEFAULT_CHILL_THRESHOLD_C = 5
+
+/**
+ * How far above the base temperature development stops accelerating.
+ *
+ * A simplification. Real upper thresholds are closer to absolute temperatures
+ * than to offsets from the base, but this is honest for a garden.
+ */
+export const UPPER_THRESHOLD_MARGIN_C = 30
+
+/** The upper threshold that pairs with a given base temperature. */
+export function upperThresholdC(baseC: number): number {
+  return baseC + UPPER_THRESHOLD_MARGIN_C
+}
+
 /** Accumulated growing degree days, elapsed days, and accumulated chilling. */
 export interface ThermalState {
   readonly accumulated: number
@@ -36,19 +57,43 @@ export function chillingHours(day: WeatherDay, thresholdC: number): number {
   return 24 * Math.max(0, Math.min(1, fraction))
 }
 
+/** A thermal state before any day has passed. */
+export const EMPTY_THERMAL: ThermalState = { accumulated: 0, days: 0, chilledHours: 0 }
+
+/**
+ * Advance a thermal budget by one day.
+ *
+ * This exists so that a simulation which grows a plant day by day can reuse the
+ * same arithmetic as `accumulateThermal`, rather than writing it out again. It
+ * was written out again once, in phenology.ts, with the thresholds as bare
+ * literals, which meant the thermal module's tests passed while the code that
+ * actually ran during growth was a separate untested copy.
+ */
+export function advanceThermal(
+  state: ThermalState,
+  day: WeatherDay,
+  baseC: number,
+  upperC: number,
+  chillThresholdC = DEFAULT_CHILL_THRESHOLD_C,
+): ThermalState {
+  return {
+    accumulated: state.accumulated + degreeDays(day, baseC, upperC),
+    days: state.days + 1,
+    chilledHours: state.chilledHours + chillingHours(day, chillThresholdC),
+  }
+}
+
 export function accumulateThermal(
   series: readonly WeatherDay[],
   baseC: number,
   upperC: number,
-  chillThresholdC = 5,
+  chillThresholdC = DEFAULT_CHILL_THRESHOLD_C,
 ): ThermalState {
-  let accumulated = 0
-  let chilledHours = 0
+  let state = EMPTY_THERMAL
   for (const day of series) {
-    accumulated += degreeDays(day, baseC, upperC)
-    chilledHours += chillingHours(day, chillThresholdC)
+    state = advanceThermal(state, day, baseC, upperC, chillThresholdC)
   }
-  return { accumulated, days: series.length, chilledHours }
+  return state
 }
 
 /**

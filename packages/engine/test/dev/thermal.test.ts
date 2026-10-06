@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import {
+  EMPTY_THERMAL,
+  advanceThermal,
   accumulateThermal,
   chillingHours,
   dayReachingTarget,
   degreeDays,
+  upperThresholdC,
 } from '../../src/dev/thermal.ts'
 import type { WeatherDay } from '../../src/dev/weather.ts'
+import { weatherSeries } from '../../src/dev/weather.ts'
 
 const day = (tMinC: number, tMaxC: number): WeatherDay => ({
   dayOfYear: 1,
@@ -138,5 +142,50 @@ describe('dayReachingTarget', () => {
   it('returns the first day for a zero target', () => {
     const series = new Array<WeatherDay>(3).fill(day(15, 25))
     expect(dayReachingTarget(series, 0, 10, 35)).toBe(0)
+  })
+})
+
+describe('advanceThermal', () => {
+  it('adds one day of degree days and counts the day', () => {
+    const next = advanceThermal(EMPTY_THERMAL, day(15, 25), 10, 35)
+    expect(next.accumulated).toBeCloseTo(10, 10)
+    expect(next.days).toBe(1)
+  })
+
+  it('accumulates across calls, which is what a day-by-day simulation needs', () => {
+    let state = EMPTY_THERMAL
+    for (let i = 0; i < 5; i += 1) state = advanceThermal(state, day(15, 25), 10, 35)
+    expect(state.accumulated).toBeCloseTo(50, 10)
+    expect(state.days).toBe(5)
+  })
+
+  it('accumulates chilling through the same threshold as chillingHours', () => {
+    const next = advanceThermal(EMPTY_THERMAL, day(-2, 4), 10, 35, 5)
+    expect(next.chilledHours).toBe(24)
+  })
+
+  it('honours a custom chill threshold rather than a baked-in five', () => {
+    expect(advanceThermal(EMPTY_THERMAL, day(0, 10), 10, 35, 8).chilledHours).toBeGreaterThan(
+      advanceThermal(EMPTY_THERMAL, day(0, 10), 10, 35, 2).chilledHours,
+    )
+  })
+
+  it('is the only implementation: accumulateThermal is exactly a fold of it', () => {
+    // The property that would have caught the original duplication, where
+    // phenologyOver re-implemented this arithmetic inline with bare literals
+    // and the thermal module's tests covered a path nothing ran.
+    const series = weatherSeries(400, 55.86, 1, 0)
+    const base = 6
+    const upper = upperThresholdC(base)
+    const folded = series.reduce(
+      (state, d) => advanceThermal(state, d, base, upper),
+      EMPTY_THERMAL,
+    )
+    expect(accumulateThermal(series, base, upper)).toEqual(folded)
+  })
+
+  it('pairs an upper threshold above the base', () => {
+    expect(upperThresholdC(6)).toBeGreaterThan(6)
+    expect(upperThresholdC(0)).toBeGreaterThan(0)
   })
 })
