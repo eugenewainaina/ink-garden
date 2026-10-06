@@ -1,7 +1,8 @@
 import { expressPlant } from '../phenotype.ts'
 import { founderGenome } from '../genome.ts'
 import { SPECIES, type SpeciesTemplate } from '../species.ts'
-import { buildShoot, layoutShoot, type Segment } from '../dev/meristem.ts'
+import { buildShoot } from '../dev/meristem.ts'
+import { layoutShoot, type Segment } from '../dev/layout.ts'
 import { shootGeometry } from '../dev/shoot.ts'
 
 /**

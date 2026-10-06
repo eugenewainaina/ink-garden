@@ -1,6 +1,6 @@
 import { normalisedTrait, type Phenotype } from '../phenotype.ts'
 import type { SpeciesTemplate } from '../species.ts'
-import type { Phyllotaxis } from './meristem.ts'
+import type { Phyllotaxis } from './phyllotaxis.ts'
 
 /** Everything the meristem needs to build a shoot, in physical units. */
 export interface ShootGeometry {
