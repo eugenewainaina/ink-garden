@@ -3,7 +3,8 @@ import { makeOrgan, type Organ } from './structure.ts'
 import {
   leavesPerNode,
   nextBudAngle,
-  projectLeaf,
+  leafDirection3,
+  projectDir,
   type Phyllotaxis,
 } from './phyllotaxis.ts'
 
@@ -56,7 +57,8 @@ export function growPhytomers(config: PhytomerConfig): Phytomers {
       // Divergence varies a little per leaf, because a plant whose leaves all
       // leave at exactly the same angle reads as a diagram.
       const divergence = config.divergenceDeg * (0.8 + leafR() * 0.4)
-      const projected = projectLeaf(azimuth, divergence)
+      const direction = leafDirection3(azimuth, divergence)
+      const projected = projectDir(direction, 0)
       leaves.push(
         makeOrgan(
           'leaf',
@@ -65,6 +67,7 @@ export function growPhytomers(config: PhytomerConfig): Phytomers {
             y: heightSoFar,
             angle: projected.angle,
             scale: projected.scale,
+            depth: direction.z,
           },
           leafLength,
           config.leafWidth,

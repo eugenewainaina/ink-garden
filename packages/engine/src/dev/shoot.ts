@@ -65,14 +65,20 @@ export function shootGeometry(
 
   // A young plant. Full stature at a jacaranda's internode length would need
   // well over a hundred nodes, which is a mature tree, not a seedling.
-  const nodes = Math.max(4, Math.min(24, Math.round(4 + species.baseline.stature * 0.6)))
+  // Internode count grows with stature, because a taller plant is mostly MORE
+  // internodes rather than longer ones. The first version gave a shrub six
+  // nodes, which is a seedling: real rosemary carries leaves at every node of
+  // every shoot and is dense with them.
+  const nodes = Math.max(6, Math.min(40, Math.round(6 + species.baseline.stature * 1.3)))
 
   // Branch angle runs from nearly upright to nearly horizontal. The lower bound
   // is not zero: a branch at zero degrees is indistinguishable from the stem.
   const branchAngle = 12 + normalisedTrait(phenotype, 'branch.angle') * 58
 
   const form = growthFormOf(phenotype)
-  const divergenceDeg = form === 'rosette' ? 78 : 55
+  // A rosette leaf leaves the crown rising steeply and then arches out, so
+  // the divergence is the ANGLE AT THE BASE, not the average posture.
+  const divergenceDeg = form === 'rosette' ? 45 : 55
 
   return {
     nodes,

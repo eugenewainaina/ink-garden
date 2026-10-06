@@ -1,5 +1,24 @@
 import type { Organ } from './structure.ts'
 import type { Shoot } from './meristem.ts'
+import {
+  UP,
+  leanInPicture,
+  projectDir,
+  projectPoint,
+  type Vec3,
+} from './phyllotaxis.ts'
+
+/**
+ * How far the camera looks down.
+ *
+ * Zero is a flat side elevation, which is what the silhouette used and what the
+ * placement tests still assume. The drawing uses a tilt, because a rosette seen
+ * edge-on is a squashed mound: its leaves lie nearly flat, so in strict
+ * elevation they overlap into an illegible mass. Tilting opens the ground plane
+ * up and gives every plant visible depth, which is the view botanical
+ * illustrators use and for the same reason.
+ */
+export const DEFAULT_TILT_DEG = 26
 
 const DEG_TO_RAD = Math.PI / 180
 
@@ -12,15 +31,68 @@ const DEG_TO_RAD = Math.PI / 180
  */
 export interface PlacedOrgan {
   readonly kind: Organ['kind']
-  /** Base of the organ: where it attaches. */
+  /** Base of the organ, in three dimensions. */
+  readonly position: Vec3
+  /** Unit direction the organ grows in, in three dimensions. */
+  readonly direction: Vec3
+  readonly length: number
+  readonly width: number
+}
+
+/** A placed organ after projection: what a renderer actually needs. */
+export interface ProjectedOrgan {
+  readonly kind: Organ['kind']
   readonly x: number
   readonly y: number
   /** In-plane angle from vertical, anticlockwise, degrees. */
   readonly angle: number
-  /** Foreshortening from projecting a 3D organ onto the picture plane. */
+  /** Foreshortening: how much of the organ's length survives the projection. */
   readonly scale: number
   readonly length: number
   readonly width: number
+  /**
+   * How much the organ faces the viewer, 0 edge-on and 1 square on.
+   *
+   * A lamina seen edge-on should be drawn as a line, not a leaf; without this a
+   * rosette's leaves all look equally broad however they are turned.
+   */
+  readonly facing: number
+}
+
+/**
+ * Project placements for a given camera tilt.
+ *
+ * `facing` is how broad the organ looks. A lamina is a flat surface, so one
+ * turned edge-on should be drawn as a narrow sliver rather than a full leaf.
+ * Without it a rosette is an illegible mass, because a dozen leaves at
+ * different angles all come out the same width.
+ */
+export function projectOrgans(
+  organs: readonly PlacedOrgan[],
+  tiltDeg = DEFAULT_TILT_DEG,
+): readonly ProjectedOrgan[] {
+  const tilt = tiltDeg * DEG_TO_RAD
+  return organs.map((organ) => {
+    const point = projectPoint(organ.position, tiltDeg)
+    const { angle, scale } = projectDir(organ.direction, tiltDeg)
+
+    // The lamina's width lies along the horizontal perpendicular to the leaf's
+    // radial direction. Recover the azimuth from the direction, then project
+    // that perpendicular to see how much of the width survives.
+    const azimuth = Math.atan2(organ.direction.z, organ.direction.x)
+    const facing = Math.hypot(Math.sin(azimuth), Math.cos(azimuth) * Math.sin(tilt))
+
+    return {
+      kind: organ.kind,
+      x: point.x,
+      y: point.y,
+      angle,
+      scale,
+      length: organ.length,
+      width: organ.width,
+      facing: Math.max(0.45, Math.min(1, facing)),
+    }
+  })
 }
 
 export interface Segment {
@@ -52,7 +124,7 @@ export function placeOrgans(
   baseAngle = 0,
 ): readonly PlacedOrgan[] {
   const out: PlacedOrgan[] = []
-  walkShoot(shoot, originX, originY, baseAngle, out)
+  walkShoot(shoot, { x: originX, y: originY, z: 0 }, baseAngle, out)
   return out
 }
 
@@ -67,59 +139,70 @@ export function layoutShoot(
   originX = 0,
   originY = 0,
   baseAngle = 0,
+  tiltDeg = 0,
 ): readonly Segment[] {
-  return placeOrgans(shoot, originX, originY, baseAngle).map((organ) => {
-    const radians = organ.angle * DEG_TO_RAD
-    const drawn = organ.length * organ.scale
-    return {
-      kind: organ.kind,
-      x1: organ.x,
-      y1: organ.y,
-      x2: organ.x + drawn * Math.sin(radians),
-      y2: organ.y + drawn * Math.cos(radians),
-      width: organ.width,
-    }
-  })
+  return projectOrgans(placeOrgans(shoot, originX, originY, baseAngle), tiltDeg).map(
+    (organ) => {
+      const radians = organ.angle * DEG_TO_RAD
+      const drawn = organ.length * organ.scale
+      return {
+        kind: organ.kind,
+        x1: organ.x,
+        y1: organ.y,
+        x2: organ.x + drawn * Math.sin(radians),
+        y2: organ.y + drawn * Math.cos(radians),
+        width: organ.width,
+      }
+    },
+  )
+}
+
+function directionFromTransform(transform: {
+  readonly angle: number
+  readonly scale: number
+  readonly depth?: number
+}): Vec3 {
+  const radians = transform.angle * DEG_TO_RAD
+  return {
+    x: Math.sin(radians) * transform.scale,
+    y: Math.cos(radians) * transform.scale,
+    z: transform.depth ?? 0,
+  }
 }
 
 function walkShoot(
   shoot: Shoot,
-  originX: number,
-  originY: number,
+  start: Vec3,
   baseAngle: number,
   out: PlacedOrgan[],
 ): void {
-  let x = originX
-  let y = originY
+  let position = start
   let angle = baseAngle
 
-  // The absolute position of each node, recorded as the axis is walked. Exact
-  // even if the axis bends, which it does not yet but will.
-  const nodes: { x: number; y: number }[] = []
-  // A leaf's own y is the distance along the axis at its node, recorded when
-  // the phytomer was built, so it identifies its node exactly.
+  // Where each node ended up, so a leaf or a branch can attach to it.
+  const nodes: Vec3[] = []
   const alongByNode: number[] = []
   let along = 0
 
   for (const internode of shoot.internodes) {
     const here = angle + internode.transform.angle
-    const radians = here * DEG_TO_RAD
-    const nextX = x + internode.length * Math.sin(radians)
-    const nextY = y + internode.length * Math.cos(radians)
+    const direction = leanInPicture(UP, here)
+    const next: Vec3 = {
+      x: position.x + internode.length * direction.x,
+      y: position.y + internode.length * direction.y,
+      z: position.z + internode.length * direction.z,
+    }
     out.push({
       kind: 'internode',
-      x,
-      y,
-      angle: here,
-      scale: 1,
+      position,
+      direction,
       length: internode.length,
       width: internode.width,
     })
-    x = nextX
-    y = nextY
+    position = next
     angle = here
     along += internode.length
-    nodes.push({ x, y })
+    nodes.push(position)
     alongByNode.push(along)
   }
 
@@ -134,12 +217,17 @@ function walkShoot(
     const node = nodeFromAlong(leaf.transform.y)
     const stem = nodes[node]
     if (stem === undefined) continue
+    const local = directionFromTransform(leaf.transform)
+    const radial = leaf.transform.radial ?? 0
+    const azimuth = Math.atan2(local.z, local.x)
     out.push({
       kind: 'leaf',
-      x: stem.x,
-      y: stem.y,
-      angle: angle + leaf.transform.angle,
-      scale: leaf.transform.scale,
+      position: {
+        x: stem.x + radial * Math.cos(azimuth),
+        y: stem.y,
+        z: stem.z + radial * Math.sin(azimuth),
+      },
+      direction: leanInPicture(local, angle),
       length: leaf.length,
       width: leaf.width,
     })
@@ -148,6 +236,6 @@ function walkShoot(
   for (const branch of shoot.branches) {
     const stem = nodes[branch.node]
     if (stem === undefined) continue
-    walkShoot(branch.shoot, stem.x, stem.y, angle + branch.angle, out)
+    walkShoot(branch.shoot, stem, angle + branch.angle, out)
   }
 }

@@ -2,10 +2,9 @@ import { writeFileSync } from 'node:fs'
 import {
   SPECIES,
   develop,
-  expressPlant,
   founderGenome,
-  genomeId,
-  sceneFromStructure,
+  sceneFromShoot,
+  shootFor,
   type SpeciesTemplate,
 } from '@ink-garden/engine'
 import { renderScene, toSvg } from '../index.ts'
@@ -58,9 +57,8 @@ const parts: string[] = []
 chosen.forEach((species, row) => {
   seeds.forEach((seed, col) => {
     const genome = founderGenome(species, seed)
-    const phenotype = expressPlant(genome, species)
-    const structure = develop({ genome, species })
-    const scene = sceneFromStructure(structure, phenotype, genomeId(genome))
+    const { shoot, phenotype, seed: plantSeed } = shootFor(genome, species)
+    const scene = sceneFromShoot(shoot, phenotype, plantSeed)
     const rendered = renderScene(scene, { padding: 16 })
 
     const cellX = PAD + col * CELL_W
@@ -83,7 +81,7 @@ chosen.forEach((species, row) => {
     )
     parts.push(
       `<text x="${cellX + 12}" y="${cellY + CELL_H - 8}" font-family="Georgia,serif" font-size="11" fill="#8a7f6a">` +
-        `organs ${structure.organCount}  height ${structure.height.toFixed(1)}  spread ${(structure.root.children.length > 0 ? structure.leafArea.toFixed(0) : '0')} leaf area</text>`,
+        `organs ${scene.shapes.length}  height ${(scene.maxY - scene.minY).toFixed(1)}  spread ${(scene.maxX - scene.minX).toFixed(1)}</text>`,
     )
   })
 })
@@ -98,13 +96,17 @@ writeFileSync(out, svg)
 process.stdout.write(`wrote ${out}: ${chosen.length} species x ${seedCount} seeds\n`)
 for (const species of chosen) {
   const genome = founderGenome(species, seeds[0] ?? 'x')
-  const phenotype = expressPlant(genome, species)
+  const { shoot, phenotype, seed: plantSeed } = shootFor(genome, species)
+  const scene = sceneFromShoot(shoot, phenotype, plantSeed)
   const structure = develop({ genome, species })
   process.stdout.write(
     `  ${species.id.padEnd(11)} habit ${(phenotype.discrete['habit.growth_form']?.expressed[0] ?? '?').padEnd(8)}` +
       ` outline ${(phenotype.discrete['leaf.outline']?.expressed[0] ?? '?').padEnd(13)}` +
       ` margin ${(phenotype.discrete['leaf.margin']?.expressed[0] ?? '?').padEnd(11)}` +
-      ` organs ${String(structure.organCount).padStart(3)}  height ${structure.height.toFixed(1)}\n`,
+      ` shapes ${String(scene.shapes.length).padStart(3)}` +
+      `  height ${(scene.maxY - scene.minY).toFixed(1).padStart(5)}` +
+      `  spread ${(scene.maxX - scene.minX).toFixed(1).padStart(5)}` +
+      `  organs ${structure.organCount}\n`,
   )
 }
 void toSvg

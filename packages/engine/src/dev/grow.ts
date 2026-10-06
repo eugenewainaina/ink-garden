@@ -2,7 +2,7 @@ import { rngFrom } from '../rng.ts'
 import type { Phenotype } from '../phenotype.ts'
 import type { SpeciesTemplate } from '../species.ts'
 import { buildShoot, type Shoot } from './meristem.ts'
-import { nextBudAngle, projectLeaf } from './phyllotaxis.ts'
+import { leafDirection3, nextBudAngle, projectDir } from './phyllotaxis.ts'
 import { shootGeometry, growthFormOf, type ShootGeometry } from './shoot.ts'
 import { makeOrgan, type Organ } from './structure.ts'
 
@@ -40,6 +40,11 @@ export function grow(
  */
 export function growRosette(geometry: ShootGeometry, seed: string): Shoot {
   const CROWN_LENGTH = 0.15
+  // A crown is a stem, and a stem has width. Leaves attaching at one
+  // mathematical point can only ever overlap, which is what made the first
+  // rosettes an illegible mass; attaching them around a ring separates them in
+  // both x and depth.
+  const CROWN_RADIUS = Math.max(0.4, geometry.leafLength * 0.28)
   const internodes: Organ[] = [
     makeOrgan('internode', { x: 0, y: 0, angle: 0, scale: 1 }, CROWN_LENGTH, 0.1),
   ]
@@ -53,11 +58,19 @@ export function growRosette(geometry: ShootGeometry, seed: string): Shoot {
     const azimuth = nextBudAngle(geometry.pattern, i)
     const length = geometry.leafLength * (0.85 + r() * 0.3)
     const divergence = geometry.divergenceDeg * (0.9 + r() * 0.2)
-    const projected = projectLeaf(azimuth, divergence)
+    const direction = leafDirection3(azimuth, divergence)
+    const projected = projectDir(direction, 0)
     leaves.push(
       makeOrgan(
         'leaf',
-        { x: 0, y: CROWN_LENGTH, angle: projected.angle, scale: projected.scale },
+        {
+          x: 0,
+          y: CROWN_LENGTH,
+          angle: projected.angle,
+          scale: projected.scale,
+          depth: direction.z,
+          radial: CROWN_RADIUS,
+        },
         length,
         geometry.leafWidth,
       ),

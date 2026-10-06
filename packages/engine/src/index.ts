@@ -72,9 +72,17 @@ export { meiosis, mutateAllele, reproduce } from './reproduce.ts'
 // --- Development: growth, placement, geometry ---
 
 export { grow, growRosette } from './dev/grow.ts'
-export { develop, type DevelopInput } from './dev/develop.ts'
-export { sceneFromStructure, type Scene, type SceneShape } from './dev/geometry.ts'
-export { placeOrgans, layoutShoot, type PlacedOrgan, type Segment } from './dev/layout.ts'
+export { develop, shootFor, type DevelopInput } from './dev/develop.ts'
+export { sceneFromShoot, type Scene, type SceneShape } from './dev/geometry.ts'
+export {
+  DEFAULT_TILT_DEG,
+  layoutShoot,
+  placeOrgans,
+  projectOrgans,
+  type PlacedOrgan,
+  type ProjectedOrgan,
+  type Segment,
+} from './dev/layout.ts'
 export {
   LEAF_MARGINS,
   LEAF_OUTLINES,
@@ -91,11 +99,17 @@ export { shootGeometry, growthFormOf, type GrowthForm, type ShootGeometry } from
 export { buildShoot, growPhytomers, type Branch, type Shoot, type ShootConfig } from './dev/meristem.ts'
 export {
   GOLDEN_ANGLE,
+  UP,
+  leanInPicture,
+  leafDirection3,
   leavesPerNode,
   nextBudAngle,
   phyllotaxisAngle,
+  projectDir,
   projectLeaf,
+  projectPoint,
   type Phyllotaxis,
+  type Vec3,
 } from './dev/phyllotaxis.ts'
 export {
   countOrgans,

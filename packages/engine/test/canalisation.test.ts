@@ -16,6 +16,7 @@ const base = (petalCount: number, stature: number): SpeciesTemplate => ({
     petalCount,
     stature,
     leafSize: 3,
+    leafAspect: 3,
     flowerSize: 2,
     stemThickness: 1,
     thermalBase: 5,

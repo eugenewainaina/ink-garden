@@ -2,8 +2,9 @@ import { expressPlant, type Phenotype } from '../phenotype.ts'
 import { genomeId, type Genome } from '../genome.ts'
 import type { SpeciesTemplate } from '../species.ts'
 import { grow } from './grow.ts'
-import { placeOrgans } from './layout.ts'
+import { DEFAULT_TILT_DEG, placeOrgans, projectOrgans } from './layout.ts'
 import { makeOrgan, describeStructure, type Organ, type Structure } from './structure.ts'
+import type { Shoot } from './meristem.ts'
 
 export interface DevelopInput {
   readonly genome: Genome
@@ -16,23 +17,37 @@ export interface DevelopInput {
 }
 
 /**
- * Assemble a plant: genome to phenotype, growth form to shoot, shoot to placed
- * organs, organs to a structure.
+ * Grow a shoot without measuring it.
  *
- * This is the entry point, and `grow` behind it is the habit seam. The M0b plan
- * had this function calling the erect shoot builder unconditionally; it is
- * written once here instead, with the dispatch in place, so adding a growth
- * form never means editing a conditional inside an existing loop.
+ * The drawing path uses this, because a picture needs organs in three
+ * dimensions with their orientations, which a flattened `Structure` cannot
+ * carry. `develop` measures; this draws.
+ */
+export function shootFor(
+  genome: Genome,
+  species: SpeciesTemplate,
+): { readonly shoot: Shoot; readonly phenotype: Phenotype; readonly seed: string } {
+  const phenotype = expressPlant(genome, species)
+  const seed = `${species.id}|${genomeId(genome)}`
+  return { shoot: grow(phenotype, species, seed), phenotype, seed }
+}
+
+/**
+ * Assemble a plant and measure it.
  *
- * Allometry is NOT applied yet. The plan's Task 9 is still pending, so the
+ * Growth form is dispatched inside `grow`, so adding a habit never means editing
+ * a conditional in a loop that already exists. Measurements are taken in the
+ * projected view, so the height reported is the height a viewer sees rather
+ * than a raw vertical sum.
+ *
+ * Allometry is NOT applied yet: the plan's Task 9 is still pending, so the
  * plausibility score is a placeholder rather than a measurement.
  */
 export function develop(input: DevelopInput): Structure {
-  const phenotype: Phenotype = expressPlant(input.genome, input.species)
-  const seed = `${input.species.id}|${genomeId(input.genome)}`
+  const { shoot } = shootFor(input.genome, input.species)
+  const projected = projectOrgans(placeOrgans(shoot), DEFAULT_TILT_DEG)
 
-  const placed = placeOrgans(grow(phenotype, input.species, seed))
-  const children: Organ[] = placed.map((organ) =>
+  const children: Organ[] = projected.map((organ) =>
     makeOrgan(
       organ.kind,
       { x: organ.x, y: organ.y, angle: organ.angle, scale: organ.scale },

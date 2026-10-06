@@ -38,6 +38,16 @@ export interface PhenotypeBaseline {
   readonly criticalDaylength: number
   /** Chilling hours required before flowering. */
   readonly vernalizationHours: number
+  /**
+   * Typical leaf length divided by width for the species.
+   *
+   * Separate from `leafSize` because size and shape are separate axes: the leaf
+   * economics spectrum varies area and proportions independently, and a species
+   * cannot be modelled from one number. Without this a dandelion's leaves came
+   * out as wide as they were long, where the Flora of New Zealand gives 5 to 30
+   * cm long against 1 to 10 cm wide, a ratio of three to six.
+   */
+  readonly leafAspect: number
 }
 
 /**
@@ -140,7 +150,8 @@ export const ROSEMARY: SpeciesTemplate = {
   baseline: {
     petalCount: 5,
     stature: 3,
-    leafSize: 1.5,
+    leafSize: 3,
+    leafAspect: 12,
     flowerSize: 1,
     stemThickness: 1.5,
     thermalBase: 6,
@@ -149,7 +160,7 @@ export const ROSEMARY: SpeciesTemplate = {
     vernalizationHours: 100,
   },
   distributions: {
-    'leaf.form': [0.95, 0.05, 0, 0, 0],
+    'leaf.form': [1, 0, 0, 0, 0],
     'leaf.margin': [1, 0, 0, 0, 0, 0, 0],
     'leaf.outline': [0, 0, 0, 0, 0, 1, 0, 0],
     'habit.growth_form': [1, 0],
@@ -191,7 +202,8 @@ export const DANDELION: SpeciesTemplate = {
     // A head of roughly fifty ligulate florets, not five petals.
     petalCount: 50,
     stature: 1.5,
-    leafSize: 4,
+    leafSize: 14,
+    leafAspect: 4.2,
     flowerSize: 2.5,
     stemThickness: 0.4,
     thermalBase: 4,
@@ -200,7 +212,7 @@ export const DANDELION: SpeciesTemplate = {
     vernalizationHours: 100,
   },
   distributions: {
-    'leaf.form': [0.9, 0.1, 0, 0, 0],
+    'leaf.form': [1, 0, 0, 0, 0],
     // The three traits the acceptance test turns on: a narrow blade that
     // is widest above the middle, lobes that lean back toward the base, and
     // no internode elongation at all.
@@ -238,6 +250,7 @@ export const SPEARMINT: SpeciesTemplate = {
     petalCount: 5,
     stature: 2,
     leafSize: 2.5,
+    leafAspect: 2,
     flowerSize: 0.5,
     stemThickness: 0.4,
     thermalBase: 5,
@@ -253,8 +266,8 @@ export const SPEARMINT: SpeciesTemplate = {
     'leaf.venation': [1, 0, 0],
     'phyllotaxis.pattern': [0, 0.95, 0.05, 0],
     // A mint spreads by runners rather than branching much.
-    'branch.apical_dominance.a': [0.4, 0.6],
-    'branch.apical_dominance.b': [0.4, 0.6],
+    'branch.apical_dominance.a': [0.15, 0.85],
+    'branch.apical_dominance.b': [0.15, 0.85],
     'stem.pigment': [1, 0],
     'thorn.presence': [1, 0],
     'inflorescence.type': [0.05, 0.35, 0.55, 0.05, 0, 0, 0, 0],
@@ -279,7 +292,8 @@ export const JACARANDA: SpeciesTemplate = {
   baseline: {
     petalCount: 5,
     stature: 20,
-    leafSize: 6,
+    leafSize: 26,
+    leafAspect: 2.4,
     flowerSize: 3,
     stemThickness: 8,
     thermalBase: 10,

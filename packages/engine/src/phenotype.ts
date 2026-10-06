@@ -176,7 +176,9 @@ const SCALED_BY_BASELINE: ReadonlyArray<{
   // internode.length is deliberately NOT here: see INTERNODE_COEFFICIENT.
   { trait: 'stem.thickness', field: 'stemThickness' },
   { trait: 'leaf.length', field: 'leafSize' },
-  { trait: 'leaf.width', field: 'leafSize' },
+  // leaf.width is NOT here. It is derived from the length and the species' own
+  // proportions, because size and shape are separate axes and one baseline
+  // cannot express both. See the leafAspect derivation below.
   { trait: 'leaf.petiole', field: 'leafSize' },
   { trait: 'flower.diameter', field: 'flowerSize' },
   { trait: 'petal.length', field: 'flowerSize' },
@@ -218,6 +220,17 @@ export function expressPlant(
       template.baseline[field],
       normalised(phenotype, trait),
     )
+  }
+
+  // Width follows from length and the species' proportions, with the genome
+  // varying the aspect around the species value rather than setting the width
+  // directly. This is what lets a dandelion be four times longer than wide
+  // while a spearmint leaf is barely twice.
+  {
+    const length = phenotype.quantitative['leaf.length'] ?? 1
+    const aspect = Math.max(1, template.baseline.leafAspect)
+    const variation = 0.75 + 0.5 * normalised(phenotype, 'leaf.width')
+    phenotype.quantitative['leaf.width'] = length / (aspect * variation)
   }
 
   // The one trait that does not scale linearly with its baseline.

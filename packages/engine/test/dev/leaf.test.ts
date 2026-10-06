@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   LEAF_MARGINS,
   LEAF_OUTLINES,
+  leafDecomposition,
   laminaProfile,
   leafOutline,
   marginFactor,
@@ -222,11 +223,13 @@ describe('marginFactor', () => {
     expect(marginFactor(0.4, 'not-a-margin', 's')).toBeCloseTo(1, 10)
   })
 
-  it('does not cut at the very base or the very tip, where there is no lamina', () => {
-    // Otherwise the leaf detaches from its petiole and loses its apex.
+  it('does not cut at the very base, where the petiole attaches', () => {
+    // Otherwise the deepest lobe lands on the attachment and detaches the blade
+    // from its stalk. The apex needs no such guard: the profile has already
+    // tapered to a point there, so there is nothing to cut.
     for (const margin of Object.keys(LEAF_MARGINS)) {
       expect(marginFactor(0, margin, 's'), margin).toBeCloseTo(1, 6)
-      expect(marginFactor(1, margin, 's'), margin).toBeCloseTo(1, 6)
+      expect(marginFactor(0.02, margin, 's'), margin).toBeGreaterThan(0.9)
     }
   })
 })
@@ -317,6 +320,69 @@ describe('leafOutline', () => {
       const b = side[i]
       if (a === undefined || b === undefined) continue
       expect(b.x, `no negative width at y ${b.y}`).toBeGreaterThanOrEqual(0)
+    }
+  })
+})
+
+describe('the biology the flora describes', () => {
+  it('arches the midrib when asked, and stays straight at zero', () => {
+    const straight = leafOutline(
+      { length: 100, width: 30, outline: 'elliptic', margin: 'entire', seed: 's', curve: 0 },
+      60,
+    )
+    const arched = leafOutline(
+      { length: 100, width: 30, outline: 'elliptic', margin: 'entire', seed: 's', curve: 1.2 },
+      60,
+    )
+    const tipOf = (points: readonly { x: number; y: number }[]): { x: number; y: number } => {
+      let best = points[0] ?? { x: 0, y: 0 }
+      for (const p of points) if (p.y > best.y) best = p
+      return best
+    }
+    // A straight blade's tip sits on the axis; an arched one has swung aside.
+    expect(Math.abs(tipOf(straight).x)).toBeLessThan(1)
+    expect(Math.abs(tipOf(arched).x)).toBeGreaterThan(15)
+  })
+
+  it('leaves the apex uncut where a terminal lobe is declared', () => {
+    // "Terminal lobe triangular to deltoid" against "lateral lobes narrowly to
+    // broadly triangular". The property is that the margin stops cutting near
+    // the apex, which leaves a solid lobe there. Measured on the margin factor,
+    // because at the very tip the blade's own taper dominates and would hide it.
+    const cutAtApex = (margin: string): number =>
+      1 - marginFactor(0.95, margin, 'phase-probe')
+    expect(cutAtApex('runcinate')).toBeLessThan(0.05)
+    expect(cutAtApex('pinnatifid')).toBeLessThan(0.05)
+    // A margin with no terminal lobe keeps cutting right up to the apex.
+    expect(cutAtApex('lobed')).toBeGreaterThan(cutAtApex('runcinate') * 4)
+  })
+
+  it('divides a compound leaf and leaves a simple one whole', () => {
+    expect(leafDecomposition('simple')).toHaveLength(1)
+    expect(leafDecomposition('pinnate').length).toBeGreaterThan(4)
+    // Bipinnate repeats the division one level down, so far more pieces.
+    expect(leafDecomposition('bipinnate').length).toBeGreaterThan(
+      leafDecomposition('pinnate').length * 3,
+    )
+  })
+
+  it('draws every rachis as a near-line rather than a blade', () => {
+    for (const placement of leafDecomposition('bipinnate')) {
+      expect(placement.widthFactor).toBeGreaterThan(0)
+      expect(placement.widthFactor).toBeLessThanOrEqual(1)
+    }
+    // The main rachis is the thinnest thing in the leaf.
+    const rachis = leafDecomposition('bipinnate')[0]
+    expect(rachis?.widthFactor).toBeLessThan(0.1)
+  })
+
+  it('keeps every lamina inside the leaf it belongs to', () => {
+    for (const placement of leafDecomposition('bipinnate')) {
+      expect(Math.abs(placement.offset.x)).toBeLessThan(0.6)
+      expect(placement.offset.y).toBeGreaterThanOrEqual(0)
+      expect(placement.offset.y).toBeLessThanOrEqual(1.01)
+      expect(placement.scale).toBeGreaterThan(0)
+      expect(placement.scale).toBeLessThanOrEqual(1)
     }
   })
 })

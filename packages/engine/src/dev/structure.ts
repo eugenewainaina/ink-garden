@@ -26,6 +26,22 @@ export interface Transform {
   /** Degrees, anticlockwise from vertical. */
   readonly angle: number
   readonly scale: number
+  /**
+   * The z component of the organ's unit direction: positive toward the viewer.
+   *
+   * Needed because the projected angle and scale alone determine a direction
+   * only up to the sign of its depth, and guessing the sign would make half a
+   * rosette face the viewer. The growth loop knows it, so it records it.
+   */
+  readonly depth?: number
+  /**
+   * How far from the stem axis this organ attaches, along its own azimuth.
+   *
+   * Zero for a leaf on an upright stem. A rosette needs it, because its leaves
+   * attach around the circumference of a compressed crown rather than all at one
+   * point, and leaves sharing a single point can only ever overlap.
+   */
+  readonly radial?: number
 }
 
 export interface Organ {
