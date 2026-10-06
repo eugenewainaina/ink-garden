@@ -88,18 +88,38 @@ export function growPhytomers(config: PhytomerConfig): Phytomers {
  * Whether an axillary bud grows out.
  *
  * Apical dominance is the suppression of buds by the shoot tip, which is why a
- * stem grows as one shoot rather than a bush. Modelled directly as a
- * probability of suppression rather than as a hormone, because a hormone would
- * be unobservable at this level anyway.
+ * stem grows as one shoot rather than a bush. Where the suppression is felt is
+ * the whole of the rule: auxin comes from the apex, so its effect is strongest
+ * near the tip and weakest at the base, and the buds that grow out are the
+ * LOWER ones. That is basitony, and it is what a shrub does.
+ *
+ * The first version of this compared a per-node random draw against the
+ * dominance and ignored the bud's position entirely, which made the branch
+ * count a binomial random variable. Two things were wrong with that. The
+ * branch pattern was not a consequence of the plant's genome, so breeding for
+ * anything re-rolled the architecture; and a plant's skeleton was decided by
+ * coin flips rather than by where its buds were.
+ *
+ * The draw is still here, as a small raggedness on where the branching zone
+ * ends. It moves the boundary by at most a node or two instead of deciding the
+ * whole plant.
  */
 export function shouldBranch(
   apicalDominance: number,
   nodeIndex: number,
+  nodeCount: number,
   r: number,
 ): boolean {
   // The lowest node has no bud worth growing: it is the seed leaf.
   if (nodeIndex === 0) return false
-  return r >= apicalDominance
+  const position = nodeCount > 1 ? nodeIndex / (nodeCount - 1) : 0
+
+  // Calibrated so a rosemary keeps about a quarter of its nodes and a
+  // jacaranda about a sixteenth, which is what the species looked like before
+  // the rule changed. A plant with no dominance at all branches on nearly half
+  // its nodes.
+  const zone = Math.max(0.03, 0.42 - 0.39 * Math.max(0, Math.min(1, apicalDominance)))
+  return position <= zone + (r - 0.5) * 0.06
 }
 
 export interface ShootConfig {
@@ -261,7 +281,7 @@ export function buildShoot(config: ShootConfig, depth = 0): Shoot {
   if (depth < MAX_BRANCH_DEPTH) {
     for (let node = 1; node < config.nodes; node += 1) {
       const r = rngFrom(`branch|${config.seed}|${depth}|${node}`)()
-      if (!shouldBranch(config.apicalDominance, node, r)) continue
+      if (!shouldBranch(config.apicalDominance, node, config.nodes, r)) continue
       const side = rngFrom(`side|${config.seed}|${depth}|${node}`)() < 0.5 ? -1 : 1
       branches.push({
         node,

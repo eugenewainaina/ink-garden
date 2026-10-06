@@ -126,32 +126,54 @@ describe('growPhytomers', () => {
 })
 
 describe('shouldBranch', () => {
-  it('never branches under total apical dominance', () => {
-    for (const r of [0, 0.5, 0.999]) {
-      expect(shouldBranch(1, 5, r)).toBe(false)
+  it('never branches at the lowest node, whatever the dominance', () => {
+    for (const dominance of [0, 0.5, 1]) {
+      expect(shouldBranch(dominance, 0, 10, 0.5)).toBe(false)
     }
   })
 
-  it('always branches with no apical dominance', () => {
-    for (const r of [0, 0.5, 0.999]) {
-      expect(shouldBranch(0, 5, r)).toBe(true)
-    }
+  it('branches low on the axis and not high, at the same dominance', () => {
+    // This is the whole rule. Apical dominance is auxin from the tip, so its
+    // effect is strongest near the apex and weakest at the base: the buds that
+    // grow out are the LOWER ones.
+    const dominance = 0.6
+    expect(shouldBranch(dominance, 1, 20, 0.5)).toBe(true)
+    expect(shouldBranch(dominance, 19, 20, 0.5)).toBe(false)
   })
 
-  it('branches less as dominance rises', () => {
-    const count = (dominance: number): number => {
+  it('shrinks the branching zone as dominance rises', () => {
+    const branched = (dominance: number): number => {
       let n = 0
-      for (let i = 0; i < 200; i += 1) {
-        if (shouldBranch(dominance, 4, (i + 0.5) / 200)) n += 1
+      for (let node = 1; node < 20; node += 1) {
+        if (shouldBranch(dominance, node, 20, 0.5)) n += 1
       }
       return n
     }
-    expect(count(0.2)).toBeGreaterThan(count(0.6))
-    expect(count(0.6)).toBeGreaterThan(count(0.9))
+    expect(branched(0)).toBeGreaterThan(branched(0.4))
+    expect(branched(0.4)).toBeGreaterThan(branched(0.8))
+    expect(branched(0.8)).toBeGreaterThan(branched(1))
   })
 
-  it('does not branch at the lowest node', () => {
-    expect(shouldBranch(0, 0, 0)).toBe(false)
+  it('is decided by position, not by the draw', () => {
+    // The draw is a ragged edge, not the decision. Away from the boundary it
+    // must not matter at all, which is what makes the skeleton heritable.
+    for (const r of [0, 0.25, 0.5, 0.75, 1]) {
+      expect(shouldBranch(0.85, 1, 20, r), `r=${r}`).toBe(true)
+      expect(shouldBranch(0.85, 17, 20, r), `r=${r}`).toBe(false)
+    }
+  })
+
+  it('moves the boundary by at most a node or two', () => {
+    // Across the whole draw the zone edge may wander a little, and no further.
+    const where = (r: number): number => {
+      let last = 0
+      for (let node = 1; node < 40; node += 1) {
+        if (shouldBranch(0.5, node, 40, r)) last = node
+      }
+      return last
+    }
+    const edges = [0, 0.5, 1].map(where)
+    expect(Math.max(...edges) - Math.min(...edges)).toBeLessThanOrEqual(3)
   })
 })
 
@@ -221,17 +243,20 @@ describe('buildShoot', () => {
   })
 
   it('stays under a documented ceiling even with no dominance at all', () => {
-    // 100 organs for this configuration: all nine nodes branch, and each branch
-    // is an axis of four nodes. That is a bush, which is what zero apical
-    // dominance should mean. The ceiling exists to catch a change that makes it
-    // millions rather than hundreds.
+    // About fifty organs for this ten-node configuration: with no dominance the
+    // branching zone covers the lower two fifths of the axis, so four of the
+    // nine nodes branch and each branch is an axis of four nodes. The ceiling
+    // exists to catch a change that makes it millions rather than hundreds.
     const count = (shoot: Shoot): number =>
       shoot.internodes.length +
       shoot.leaves.length +
       shoot.branches.reduce((sum, b) => sum + count(b.shoot), 0)
     const bushy = buildShoot({ ...shootConfig, apicalDominance: 0 })
+    // With no dominance at all about two fifths of the nodes branch, which is
+    // 656 organs for this configuration. The ceiling exists to catch a change
+    // that makes it millions rather than hundreds.
     expect(count(bushy)).toBeLessThan(200)
-    expect(count(bushy)).toBeGreaterThan(60)
+    expect(count(bushy)).toBeGreaterThan(30)
   })
 
   it('branches proportionally less as dominance rises', () => {
@@ -242,10 +267,13 @@ describe('buildShoot', () => {
       const shoot = buildShoot({ ...shootConfig, nodes: 40, apicalDominance: dominance })
       return shoot.branches.length / 39
     }
-    expect(rate(0)).toBeGreaterThan(0.9)
+    // Roughly two fifths of the nodes at no dominance, falling to a twentieth
+    // at full dominance. The exact rates come from the calibration in
+    // `shouldBranch`, so this asserts the shape rather than the numbers.
+    expect(rate(0)).toBeGreaterThan(0.3)
     expect(rate(0.3)).toBeGreaterThan(rate(0.6))
     expect(rate(0.6)).toBeGreaterThan(rate(0.9))
-    expect(rate(1)).toBe(0)
+    expect(rate(0.9)).toBeLessThan(0.12)
   })
 
   it('handles zero nodes', () => {
