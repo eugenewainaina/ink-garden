@@ -87,6 +87,11 @@ export function flowerShapes(
   // a classic breeding goal, which is why it belongs in a garden rather than in
   // a list of unused loci.
   const pattern = phenotype.discrete['pigment.pattern']?.expressed[0] ?? 'solid'
+  // A ZYGOMORPHIC corolla is two-lipped, and three of these four species are:
+  // Bean's gives rosemary a "corolla two-lipped", and Lamiaceae and
+  // Bignoniaceae are both zygomorphic as families. Drawing them all radially
+  // was a visible inaccuracy in three species out of four.
+  const zygomorphic = phenotype.discrete['flower.symmetry']?.expressed[0] === 'zygomorphic'
   // The ABC model decides what each of the four whorls BECOMES. `identity.ts`
   // has resolved this since the beginning and nothing called it, so the two
   // homeotic mutations it exists for were expressed on every plant and drawn on
@@ -315,10 +320,30 @@ export function flowerShapes(
     }
   }
 
+  // The angles the petals sit at. Radially they are evenly spaced; in a
+  // two-lipped flower they gather into an upper lip and a lower lip with a gap
+  // between them, which is the whole difference between a mint and a daisy.
+  const angles: number[] = []
+  if (zygomorphic && !isHead && drawn > 2) {
+    const upper = Math.max(1, Math.round(drawn * 0.4))
+    const lower = Math.max(1, drawn - upper)
+    // Angles are measured so that zero is UP: `outward` is (sin, cos). The
+    // first version used 90 and 270 and so put the two lips on the left and
+    // right, which is a zygomorphic flower rotated a quarter turn.
+    for (let i = 0; i < upper; i += 1) {
+      angles.push((upper === 1 ? 0 : (i / (upper - 1) - 0.5) * 54))
+    }
+    // The lower lip is the larger and spreads wider, which is what makes a
+    // dead-nettle look like a mouth rather than a star.
+    for (let i = 0; i < lower; i += 1) {
+      angles.push(180 + (lower === 1 ? 0 : (i / (lower - 1) - 0.5) * 84))
+    }
+  } else {
+    for (let i = 0; i < drawn; i += 1) angles.push(phase + (i * 360) / drawn)
+  }
+
   for (let i = 0; i < drawn; i += 1) {
-    // A corolla is symmetric about the flower's axis; a head's florets all
-    // point outward from the disc with no gap at the centre.
-    const angle = phase + (i * 360) / drawn
+    const angle = angles[i] ?? phase + (i * 360) / drawn
     const radians = (angle * Math.PI) / 180
     const outward = { x: Math.sin(radians), y: Math.cos(radians) }
 

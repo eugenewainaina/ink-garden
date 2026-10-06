@@ -76,7 +76,6 @@ const UNDRAWN: Readonly<Record<string, string>> = {
   'pigment.cold.response': 'needs a temperature the scene does not receive',
   'pigment.gradient_extent': 'the pattern is drawn at a fixed extent',
   'pigment.tip_shift': 'the pattern is drawn at a fixed hue shift',
-  'flower.symmetry': 'a zygomorphic flower is drawn radially',
   'leaf.form':
     'decomposition handles simple, pinnate and bipinnate; the palmate and cordate alleles fall back to a simple lamina, so only the last allele is inert',
 
