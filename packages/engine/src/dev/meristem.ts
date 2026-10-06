@@ -53,7 +53,12 @@ export function growPhytomers(config: PhytomerConfig): Phytomers {
     for (let i = 0; i < perNode; i += 1) {
       const azimuth = nextBudAngle(config.pattern, node) + (i * 360) / perNode
       const leafR = rngFrom(`leaf|${config.seed}|${node}|${i}`)
-      const leafLength = config.leafLength * (0.8 + leafR() * 0.4)
+      // Leaf size is not uniform along a shoot. It rises from the base to a
+      // maximum around the middle and falls again toward the tip, which is the
+      // heteroblastic gradient every shoot has and one of the reasons a stem
+      // does not read as a row of identical leaves.
+      const gradient = leafGradient(config.nodes > 1 ? node / (config.nodes - 1) : 0.5)
+      const leafLength = config.leafLength * gradient * (0.85 + leafR() * 0.3)
       // Divergence varies a little per leaf, because a plant whose leaves all
       // leave at exactly the same angle reads as a diagram.
       const divergence = config.divergenceDeg * (0.8 + leafR() * 0.4)
@@ -146,6 +151,24 @@ export interface Shoot {
  * rises when growth over time arrives in M1, not before.
  */
 const MAX_BRANCH_DEPTH = 1
+
+/**
+ * Leaf size along a shoot, relative to the shoot's typical leaf.
+ *
+ * Peaks around the middle and falls to about six tenths at either end. The
+ * coefficient is chosen so the MEAN is exactly one: the term
+ * `1 - (2t - 1)^2` averages two thirds over the shoot, so 0.55 + 0.675 * that
+ * gives a mean of one and a range of 0.55 to 1.23.
+ *
+ * Centring it matters. A species' typical leaf size comes from a flora, and a
+ * gradient whose mean is not one silently inflates every leaf by its offset.
+ * The first version averaged 1.15 and would have made every species' leaves
+ * fifteen per cent longer than the flora they were taken from.
+ */
+export function leafGradient(position: number): number {
+  const t = Math.max(0, Math.min(1, position))
+  return 0.55 + 0.675 * (1 - (2 * t - 1) ** 2)
+}
 
 /**
  * Where flowers sit on a shoot, as node indices.

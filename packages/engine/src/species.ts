@@ -203,6 +203,12 @@ export const ROSEMARY: SpeciesTemplate = {
     'inflorescence.type': [0, 0, 0, 0, 0, 0, 0, 1],
     'flower.symmetry': [0, 1],
     'petal.shape': [0, 0, 0.3, 0.7, 0],
+    // Pale: an anthocyanidin identity sets the hue, and this sets how much of
+    // it there is. Low intensity is what makes a violet corolla pale rather
+    // than deep.
+    'pigment.intensity.a': [0.94, 0.06],
+    'pigment.intensity.b': [0.94, 0.06],
+    'pigment.intensity.c': [0.94, 0.06],
     'pigment.anthocyanidin': [0.05, 0.1, 0.25, 0.6],
     'pigment.carotenoid': [1, 0, 0, 0],
     'photoperiod.response': [0.3, 0.4, 0.3],
@@ -279,7 +285,7 @@ export const SPEARMINT: SpeciesTemplate = {
   baseline: {
     petalCount: 5,
     stature: 2,
-    leafSize: 2.5,
+    leafSize: 4.2,
     internodeScale: 0.8,
     leafAspect: 4.5,
     leafHue: 100,

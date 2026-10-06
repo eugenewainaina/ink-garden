@@ -1,7 +1,7 @@
 import { rngFrom } from '../rng.ts'
 import type { Phenotype } from '../phenotype.ts'
 import type { SpeciesTemplate } from '../species.ts'
-import { buildShoot, type Shoot } from './meristem.ts'
+import { buildShoot, leafGradient, type Shoot } from './meristem.ts'
 import { leafDirection3, nextBudAngle, projectDir } from './phyllotaxis.ts'
 import { shootGeometry, growthFormOf, type ShootGeometry } from './shoot.ts'
 import { makeOrgan, type Organ } from './structure.ts'
@@ -82,7 +82,11 @@ export function growRosette(geometry: ShootGeometry, seed: string): Shoot {
   for (let i = 0; i < count; i += 1) {
     const r = rngFrom(`rosette|${seed}|${i}`)
     const azimuth = nextBudAngle(geometry.pattern, i)
-    const length = geometry.leafLength * (0.85 + r() * 0.3)
+    // A rosette's leaves emerge in sequence from the centre outwards, so the
+    // oldest are the largest. Same gradient, measured by leaf age rather than
+    // by height up a stem.
+    const age = count > 1 ? 1 - i / (count - 1) : 0.5
+    const length = geometry.leafLength * leafGradient(age) * (0.88 + r() * 0.24)
     const divergence = geometry.divergenceDeg * (0.9 + r() * 0.2)
     const direction = leafDirection3(azimuth, divergence)
     const projected = projectDir(direction, 0)
