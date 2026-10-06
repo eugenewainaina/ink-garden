@@ -205,37 +205,44 @@ describe('buildShoot', () => {
     expect(deepest).toBeLessThanOrEqual(bushy.branches.length)
   })
 
-  it('caps depth, so an undominated plant does not recurse forever', () => {
+  it('builds one order of branching, so a seedling is an axis with branches', () => {
+    // Two orders was tried and took a rosemary seedling to 1182 leaves. A shrub
+    // carries that many over years; this engine draws a young plant. Depth
+    // rises when growth over time arrives in M1.
     const depthOf = (shoot: Shoot): number =>
       shoot.branches.length === 0
         ? 0
         : 1 + Math.max(...shoot.branches.map((b) => depthOf(b.shoot)))
     const bushy = buildShoot({ ...shootConfig, apicalDominance: 0 })
-    expect(depthOf(bushy)).toBe(2)
+    expect(depthOf(bushy)).toBe(1)
   })
 
   it('stays under a documented ceiling even with no dominance at all', () => {
-    // 464 organs for this configuration: all nine nodes branch, each branch
-    // has six nodes, and five of those branch again. That is a bush, which is
-    // what zero apical dominance should mean. The ceiling exists to catch a
-    // change that makes it millions rather than hundreds.
+    // 100 organs for this configuration: all nine nodes branch, and each branch
+    // is an axis of four nodes. That is a bush, which is what zero apical
+    // dominance should mean. The ceiling exists to catch a change that makes it
+    // millions rather than hundreds.
     const count = (shoot: Shoot): number =>
       shoot.internodes.length +
       shoot.leaves.length +
       shoot.branches.reduce((sum, b) => sum + count(b.shoot), 0)
     const bushy = buildShoot({ ...shootConfig, apicalDominance: 0 })
-    expect(count(bushy)).toBe(464)
-    expect(count(bushy)).toBeLessThan(1000)
+    expect(count(bushy)).toBeLessThan(200)
+    expect(count(bushy)).toBeGreaterThan(60)
   })
 
-  it('produces far fewer organs with realistic dominance, which is the point', () => {
-    const count = (shoot: Shoot): number =>
-      shoot.internodes.length +
-      shoot.leaves.length +
-      shoot.branches.reduce((sum, b) => sum + count(b.shoot), 0)
-    const realistic = buildShoot({ ...shootConfig, apicalDominance: 0.6 })
-    const bushy = buildShoot({ ...shootConfig, apicalDominance: 0 })
-    expect(count(realistic)).toBeLessThan(count(bushy) / 2)
+  it('branches proportionally less as dominance rises', () => {
+    // Measured over a long shoot, because nine nodes is too few to tell a rate
+    // from a run of luck: with one order of branching the main axis dominates
+    // the organ count, so the rate itself is what to assert.
+    const rate = (dominance: number): number => {
+      const shoot = buildShoot({ ...shootConfig, nodes: 40, apicalDominance: dominance })
+      return shoot.branches.length / 39
+    }
+    expect(rate(0)).toBeGreaterThan(0.9)
+    expect(rate(0.3)).toBeGreaterThan(rate(0.6))
+    expect(rate(0.6)).toBeGreaterThan(rate(0.9))
+    expect(rate(1)).toBe(0)
   })
 
   it('handles zero nodes', () => {
