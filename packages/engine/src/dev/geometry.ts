@@ -299,15 +299,34 @@ export function sceneFromShoot(
   // rosemary is grey-green from its hairs and wax, a dandelion is dark green,
   // and a jacaranda is a light yellow-green. Stems are a duller, browner
   // version of the same hue rather than a separate fixed colour.
+  // Hairs scatter light and hide the cuticle, so a felted leaf is greyer than
+  // a glabrous one. Bean's gives rosemary "dark rather glossy green above,
+  // WHITE-FELTED BENEATH", and pubescence has been a locus from the beginning
+  // with nothing reading it.
+  //
+  // The wash is DELIBERATELY SMALL, because the species colour already carries
+  // the felt: rosemary's baseline saturation and lightness were set from that
+  // same sentence several rounds ago. A strong wash here double-counts and
+  // turns the plant pale, which is the same mistake as reapplying Corner's
+  // rules on top of leaf sizes already taken from a flora.
+  const leafPubescent =
+    phenotype.discrete['leaf.pubescence']?.expressed[0] === 'pubescent'
+  const stemPubescent =
+    phenotype.discrete['stem.pubescence']?.expressed[0] === 'pubescent'
+  const hair = (pubescent: boolean): number => (pubescent ? 1 : 0)
+
   const leafFill = hsvToHex(
     species.baseline.leafHue,
-    species.baseline.leafSaturation,
-    species.baseline.leafLightness,
+    species.baseline.leafSaturation * (1 - 0.16 * hair(leafPubescent)),
+    Math.min(0.95, species.baseline.leafLightness * (1 + 0.14 * hair(leafPubescent))),
   )
   const stemFill = hsvToHex(
     species.baseline.leafHue - 22,
-    Math.min(1, species.baseline.leafSaturation + 0.14),
-    species.baseline.leafLightness * 0.85,
+    Math.min(1, species.baseline.leafSaturation + 0.14) * (1 - 0.14 * hair(stemPubescent)),
+    Math.min(
+      0.95,
+      species.baseline.leafLightness * 0.85 * (1 + 0.14 * hair(stemPubescent)),
+    ),
   )
 
 
@@ -336,6 +355,12 @@ export function sceneFromShoot(
   const gloss = normalisedTrait(phenotype, 'leaf.gloss')
   // A highlight is the paper showing through the wax rather than a colour of
   // its own, so it is the palest thing in the palette.
+  // The felt itself: nearly white, which is what "white-felted" means.
+  const feltFill = hsvToHex(
+    species.baseline.leafHue + 10,
+    Math.max(0.02, species.baseline.leafSaturation * 0.18),
+    Math.min(0.96, species.baseline.leafLightness * 1.75),
+  )
   const sheenFill = hsvToHex(
     species.baseline.leafHue + 6,
     Math.max(0.02, species.baseline.leafSaturation * 0.25),
@@ -396,6 +421,11 @@ export function sceneFromShoot(
     if (organ.depth > maxDepth) maxDepth = organ.depth
   }
   const colours = plantPalette(phenotype, species)
+// A felted leaf is greyer and matter: the hairs scatter light and hide the
+// cuticle, which is why a rosemary reads grey-green where a mint reads bright.
+// Bean's gives rosemary leaves as "white-felted beneath", and pubescence has
+// been a locus from the beginning with nothing reading it.
+// `leafPubescent` above is the same fact; the felt rim reads it directly.
   // A faint edge on every petal. Not part of the palette: it is an outline, and
   // a white corolla on pale paper is invisible without one.
   // A petiole is stem tissue and lighter than the blade, which is how it reads
@@ -550,10 +580,15 @@ export function sceneFromShoot(
         // leaves most of the way to yellow before the plant drops them.
         const senescing =
           shoot.flowerStage === 'seed' ? Math.min(0.9, age * senescenceRate * 1.9) : 0
+        // Start from the species colour WITH the hair wash, not from the raw
+        // baseline. The ageing block was written against the baseline and so
+        // bypassed `leafFill` entirely, which left pubescence with no effect on
+        // the blade at all: the flag was true, the colour was computed, and the
+        // blade did not use it.
         const aged = shiftHue(
           species.baseline.leafHue,
-          species.baseline.leafSaturation,
-          species.baseline.leafLightness,
+          species.baseline.leafSaturation * (1 - 0.16 * hair(leafPubescent)),
+          Math.min(0.95, species.baseline.leafLightness * (1 + 0.14 * hair(leafPubescent))),
           // Chlorophyll goes first and leaves the carotenoids: yellow, then
           // brown at the far end.
           44,
@@ -570,12 +605,19 @@ export function sceneFromShoot(
         // few millimetres across, and an edge on each of them doubled the tree
         // to a hundred and twenty thousand shapes without being visible.
         if (lamina.scale >= 0.12) {
+          // On a felted leaf the edge is the FELT rather than a darker blade:
+          // the hairs run along a margin that recurves, which is what gives a
+          // rosemary its pale rim.
+          const edgeColour = leafPubescent ? feltFill : leafEdge
           shapes.push({
             role: 'leaf',
             points,
             fill: 'none',
-            stroke: lit ? shadeHex(leafEdge, shade) : leafEdge,
-            strokeWidth: Math.max(0.02, drawnLength * 0.009 * lamina.scale),
+            stroke: lit ? shadeHex(edgeColour, shade) : edgeColour,
+            strokeWidth: Math.max(
+              0.02,
+              drawnLength * (leafPubescent ? 0.014 : 0.009) * lamina.scale,
+            ),
           })
         }
 

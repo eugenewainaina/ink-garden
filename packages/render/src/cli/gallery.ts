@@ -9,7 +9,7 @@ import {
 } from '@ink-garden/engine'
 import { renderScene, toSvg } from '../index.ts'
 import { LOCI } from '../../../engine/src/loci.ts'
-import { setQuantitative } from '../../../engine/test/helpers.ts'
+import { setAlleleByName, setQuantitative } from '../../../engine/test/helpers.ts'
 
 /**
  * Render a sheet of plants.
@@ -80,6 +80,11 @@ chosen.forEach((species, row) => {
     let genome = founderGenome(species, seed)
     // --set trait=value forces a quantitative trait, so an extreme can be
     // looked at rather than hunted for among seedlings.
+    for (const spec of (args['allele'] ?? '').split(',').filter(Boolean)) {
+      const [locusId, allele] = spec.split('=')
+      if (locusId === undefined || allele === undefined) continue
+      genome = setAlleleByName(genome, locusId, allele, allele)
+    }
     for (const spec of (args['set'] ?? '').split(',').filter(Boolean)) {
       const [trait, value] = spec.split('=')
       if (trait === undefined || value === undefined) continue
