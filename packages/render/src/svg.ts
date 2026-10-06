@@ -26,6 +26,15 @@ export interface SvgOptions {
   readonly ink?: boolean
   /** Seeds the paper; the same seed gives the same sheet. */
   readonly seed?: string
+  /**
+   * Decimal places in the output coordinates.
+   *
+   * A number is most of a path's bytes, so this is the cheapest size lever
+   * there is. Two places is right for a wallpaper; at thumbnail size a tenth of
+   * a user unit is already smaller than a pixel and the extra digit is paid for
+   * and never seen.
+   */
+  readonly precision?: number
 }
 
 /** A small integer generator, so the paper is reproducible without a dependency. */
@@ -83,12 +92,19 @@ function paperDefs(seed: string): string {
 </filter>`
 }
 
-function pathFor(shape: SceneShape, toX: (x: number) => number, toY: (y: number) => number): string {
+function pathFor(
+  shape: SceneShape,
+  toX: (x: number) => number,
+  toY: (y: number) => number,
+  precision: number,
+): string {
   const parts: string[] = []
   for (let i = 0; i < shape.points.length; i += 1) {
     const point = shape.points[i]
     if (point === undefined) continue
-    parts.push(`${i === 0 ? 'M' : 'L'}${toX(point.x).toFixed(2)},${toY(point.y).toFixed(2)}`)
+    parts.push(
+      `${i === 0 ? 'M' : 'L'}${toX(point.x).toFixed(precision)},${toY(point.y).toFixed(precision)}`,
+    )
   }
   // An open path, like a vein, must not be closed.
   const close = shape.closed === false ? '' : ' Z'
@@ -107,6 +123,7 @@ export interface Rendered {
 export function renderScene(scene: Scene, options: SvgOptions = {}): Rendered {
   const padding = options.padding ?? 12
   const zoom = options.zoom ?? 1
+  const precision = Math.max(0, Math.min(3, options.precision ?? 2))
 
   const spanX = Math.max(1e-6, (scene.maxX - scene.minX) * zoom)
   const spanY = Math.max(1e-6, (scene.maxY - scene.minY) * zoom)
@@ -124,7 +141,7 @@ export function renderScene(scene: Scene, options: SvgOptions = {}): Rendered {
         shape.stroke === undefined
           ? ''
           : ` stroke="${shape.stroke}" stroke-width="${(shape.strokeWidth ?? 0.05) * zoom}" stroke-linejoin="round" stroke-linecap="round"`
-      return `<path d="${pathFor(shape, toX, toY)}" fill="${shape.fill}"${edge}/>`
+      return `<path d="${pathFor(shape, toX, toY, precision)}" fill="${shape.fill}"${edge}/>`
     })
     .join('\n')
 

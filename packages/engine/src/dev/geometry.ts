@@ -143,13 +143,35 @@ const LAMINA_SAMPLES = 28
  * `placeOrgans`, so this only has to give each one a shape and rotate it into
  * place. Leaves get a real lamina; everything axial gets a tapered quad.
  */
+export interface SceneOptions {
+  readonly tiltDeg?: number
+  /**
+   * How much of a compound leaf's subdivision to build, from 0 to 1.
+   *
+   * A jacaranda leaf carries a few hundred pinnules because that is what the
+   * flora says and what makes the foliage feathery, and a tree carries dozens
+   * of leaves: full detail is about sixty thousand shapes and thirty megabytes
+   * of SVG. That is right for a wallpaper and absurd for a thumbnail on a
+   * phone, where a pinnule is well under a pixel.
+   *
+   * Detail below a pixel is not detail, it is file size. This scales the
+   * subdivision, not the plant: everything else, including where the leaves
+   * are and how big they are, is unaffected.
+   */
+  readonly detail?: number
+}
+
 export function sceneFromShoot(
   shoot: Shoot,
   phenotype: Phenotype,
   species: SpeciesTemplate,
   seed: string,
-  tiltDeg = DEFAULT_TILT_DEG,
+  tiltDeg: number | SceneOptions = DEFAULT_TILT_DEG,
 ): Scene {
+  const options: SceneOptions =
+    typeof tiltDeg === 'number' ? { tiltDeg } : tiltDeg
+  const detail = Math.max(0.2, Math.min(1, options.detail ?? 1))
+  tiltDeg = options.tiltDeg ?? DEFAULT_TILT_DEG
   // Foliage colour comes from the species, because it is a species trait:
   // rosemary is grey-green from its hairs and wax, a dandelion is dark green,
   // and a jacaranda is a light yellow-green. Stems are a duller, browner
@@ -188,7 +210,10 @@ export function sceneFromShoot(
   const margin = phenotype.discrete['leaf.margin']?.expressed[0] ?? 'entire'
   const leafForm = phenotype.discrete['leaf.form']?.expressed[0] ?? 'simple'
   const inflorescence = phenotype.discrete['inflorescence.type']?.expressed[0] ?? 'solitary'
-  const laminae = leafDecomposition(leafForm)
+  const laminae = leafDecomposition(leafForm, {
+    pinnae: Math.max(3, Math.round(12 * detail)),
+    pinnules: Math.max(2, Math.round(12 * detail)),
+  })
   const venation = phenotype.discrete['leaf.venation']?.expressed[0] ?? 'pinnate'
   // A vein is a LIGHTER line on the blade. That is not a stylistic choice: a
   // vein is raised and its bundle sheath is often unpigmented, so it catches
@@ -324,7 +349,13 @@ export function sceneFromShoot(
             seed: `${seed}|leaf|${i}|${k}`,
             curve: arch,
           },
-          lamina.scale >= 1 ? LAMINA_SAMPLES : Math.round(LAMINA_SAMPLES * 0.6),
+          // Points scale with how large the curve is actually drawn. A curve's
+          // needed resolution falls with its size, and a jacaranda's pinnule is
+          // a twentieth of its leaf: giving it the leaf's own point count cost
+          // half a megabyte of coordinates that no one can see. The square root
+          // is the compromise, since fidelity wants points proportional to size
+          // and sub-pixel accuracy wants far fewer.
+          Math.max(5, Math.round(LAMINA_SAMPLES * Math.sqrt(Math.max(0.02, lamina.scale)))),
         ).map((point: Point) => ({
           // Rotate the lamina about its own base, then move it into the leaf.
           x: baseX + point.x * laminaCos + point.y * laminaSin,

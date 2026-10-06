@@ -54,12 +54,28 @@ const width = PAD * 2 + CELL_W * seedCount
 const height = PAD * 2 + (CELL_H + LABEL_H) * chosen.length
 const parts: string[] = []
 
+// How much of a compound leaf's subdivision to build at this output size.
+//
+// The first attempt scaled this straight with the target and reduced a
+// jacaranda to four pinnae of four pinnules at phone size, on the reasoning
+// that detail below a pixel is not detail. That reasoning is WRONG for
+// foliage. A pinnule under a pixel still contributes to the mass, and the mass
+// is what makes a jacaranda read as feathery; the aggregate of sub-pixel
+// leaflets is the texture, not waste. The render showed bare pinna ribs where
+// foliage should be.
+//
+// So the floor is high: this trims the extreme case and never below about
+// two-thirds of full subdivision.
+const targetWidth = Number.parseInt(args['width'] ?? '1200', 10)
+const detail = Math.max(0.66, Math.min(1, 0.5 + (targetWidth / 1000) * 0.5))
+const precision = targetWidth >= 1000 ? 2 : 1
+
 chosen.forEach((species, row) => {
   seeds.forEach((seed, col) => {
     const genome = founderGenome(species, seed)
     const { shoot, phenotype, seed: plantSeed } = shootFor(genome, species)
-    const scene = sceneFromShoot(shoot, phenotype, species, plantSeed)
-    const rendered = renderScene(scene, { padding: 16 })
+    const scene = sceneFromShoot(shoot, phenotype, species, plantSeed, { detail })
+    const rendered = renderScene(scene, { padding: 16, precision })
 
     const cellX = PAD + col * CELL_W
     const cellY = PAD + row * (CELL_H + LABEL_H)
@@ -114,7 +130,7 @@ process.stdout.write(`wrote ${out}: ${chosen.length} species x ${seedCount} seed
 for (const species of chosen) {
   const genome = founderGenome(species, seeds[0] ?? 'x')
   const { shoot, phenotype, seed: plantSeed } = shootFor(genome, species)
-  const scene = sceneFromShoot(shoot, phenotype, species, plantSeed)
+  const scene = sceneFromShoot(shoot, phenotype, species, plantSeed, { detail })
   const structure = develop({ genome, species })
   process.stdout.write(
     `  ${species.id.padEnd(11)} habit ${(phenotype.discrete['habit.growth_form']?.expressed[0] ?? '?').padEnd(8)}` +
