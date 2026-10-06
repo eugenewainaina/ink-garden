@@ -3,6 +3,7 @@ import type { ProjectedOrgan } from '@ink-garden/engine'
 import { flowerShapes } from '../../../engine/src/dev/flower.ts'
 import { toSvg } from '../index.ts'
 import { plantPalette } from '../../../engine/src/dev/geometry.ts'
+import { setAlleleByName } from '../../../engine/test/helpers.ts'
 
 /**
  * One flower, large.
@@ -24,7 +25,16 @@ for (let i = 0; i < argv.length; i += 1) {
 const species = SPECIES.find((s) => s.id === (args['species'] ?? 'rosemary')) ?? SPECIES[0]
 if (species === undefined) throw new Error('no species')
 
-const genome = founderGenome(species, args['seed'] ?? 'flower')
+let genome = founderGenome(species, args['seed'] ?? 'flower')
+// The homeotic mutations, so a double flower and a petaloid sepal can actually
+// be looked at. Both are recessive in the catalogue, which is why they are rare
+// and why forcing them is the only way to check the drawing.
+if (args['double'] === 'true') {
+  genome = setAlleleByName(genome, 'flower.doubling', 'double', 'double')
+}
+if (args['petaloid'] === 'true') {
+  genome = setAlleleByName(genome, 'flower.organ.identity', 'sepals.petaloid', 'sepals.petaloid')
+}
 const phenotype = expressPlant(genome, species)
 const inflorescence = phenotype.discrete['inflorescence.type']?.expressed[0] ?? 'solitary'
 

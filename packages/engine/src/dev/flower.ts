@@ -3,6 +3,7 @@ import type { SpeciesTemplate } from '../species.ts'
 import { LEAF_OUTLINES, leafOutline, type Point } from './leaf.ts'
 import type { ProjectedOrgan } from './layout.ts'
 import { POINTED_TAPER, ellipse, taperedStroke } from './stroke.ts'
+import { petaloidWhorls } from './identity.ts'
 
 /**
  * Flower geometry.
@@ -77,6 +78,23 @@ export function flowerShapes(
   const margin = PETAL_MARGIN[marginTerm] ?? 'entire'
 
   const isHead = inflorescence === 'head'
+  // The ABC model decides what each of the four whorls BECOMES. `identity.ts`
+  // has resolved this since the beginning and nothing called it, so the two
+  // homeotic mutations it exists for were expressed on every plant and drawn on
+  // none. Both matter here: a petaloid sepal is an ornamental flower, and a
+  // DOUBLE flower is what happens when class C is lost and whorl three becomes
+  // petals instead of stamens, which is a classic breeding goal for a garden.
+  const whorls = petaloidWhorls(phenotype)
+  const sepalsAsPetals = whorls.includes(1)
+  const stamensAsPetals = whorls.includes(3)
+  //
+  // The COUNT is already right: `phenotype.ts` multiplies `petal.count` for a
+  // double, because a homeotic conversion is a trait and not a drawing
+  // decision. What the ABC model adds here is that the petals arrive in TWO
+  // whorls rather than one, so they are split between an outer ring and an
+  // inner ring instead of all being drawn at the same radius. Adding a ring on
+  // top of the doubled count made a double-double, which is twenty petals.
+
   const outline = isHead ? 'spatulate' : (PETAL_OUTLINE[shapeTerm] ?? 'obovate')
   // A mint's corolla really is 2.5 mm, which on a 20 cm plant is a pixel. The
   // model keeps the true size and the DRAWING floors it, so a small flower
@@ -136,7 +154,11 @@ export function flowerShapes(
   // A capitulum reads as a disc because its ligules overlap heavily. Drawn as
   // thin spikes that barely touch, a dandelion looks like a sea urchin, which
   // is exactly what the first flower close-up showed.
-  const drawn = Math.max(1, Math.min(isHead ? 96 : 12, petals))
+  // A doubled flower's petals belong to two whorls, so the total is split
+  // between the outer corolla and the converted inner whorl.
+  const outerPetals = stamensAsPetals ? Math.max(1, Math.round(petals / 2)) : petals
+  const innerPetals = stamensAsPetals ? Math.max(0, petals - outerPetals) : 0
+  const drawn = Math.max(1, Math.min(isHead ? 96 : 12, outerPetals))
   const phase = (seed.length * 37) % 360
 
   // ---- The seed head ----
@@ -230,7 +252,7 @@ export function flowerShapes(
     : centre
   const cupRadius = isHead ? petalLength * 0.62 : sepalLength * 0.78
   const cup = ellipse(cupCentre, cupRadius, cupRadius * (isHead ? 0.5 : 0.77), 14)
-  out.push({ points: cup, fill: colours.calyx })
+  out.push({ points: cup, fill: sepalsAsPetals ? colours.petal : colours.calyx })
 
   const phase0 = phase + 180 / sepals
   for (let i = 0; i < sepals; i += 1) {
@@ -258,7 +280,9 @@ export function flowerShapes(
         point.x * Math.sin(radians) +
         point.y * outward.y,
     }))
-    if (lobe.length >= 3) out.push({ points: lobe, fill: colours.calyx })
+    if (lobe.length >= 3) {
+      out.push({ points: lobe, fill: sepalsAsPetals ? colours.petal : colours.calyx })
+    }
   }
 
   for (let i = 0; i < drawn; i += 1) {
@@ -318,7 +342,11 @@ export function flowerShapes(
   // NORMALISED, not raw. A quantitative trait's stored value runs to the sum of
   // its loci weights, which is 1.64 for stamen count, so using it directly gave
   // a dandelion nine stamens where five is the family's number.
-  const stamens = Math.max(1, Math.round(2 + normalisedTrait(phenotype, 'stamen.count') * 4))
+  // Whorl three becomes petals in a double flower, so there are no stamens to
+  // draw: they are the petals.
+  const stamens = stamensAsPetals
+    ? 0
+    : Math.max(1, Math.round(2 + normalisedTrait(phenotype, 'stamen.count') * 4))
   const exserted = (phenotype.discrete['stamen.exsertion']?.expressed[0] ?? 'included') === 'exserted'
   const drawnStamens = Math.min(stamens, 8)
 
@@ -328,6 +356,30 @@ export function flowerShapes(
   const organLength = petalLength * (exserted ? 1.05 : 0.6)
   const organBase = { x: centre.x, y: centre.y }
   const phase2 = phase + 30
+
+  if (innerPetals > 0) {
+    // The converted stamens, as a ring of petals inside the corolla.
+    const inner = Math.max(1, Math.min(12, innerPetals))
+    for (let i = 0; i < inner; i += 1) {
+      const radians = ((phase2 + (i * 360) / inner) * Math.PI) / 180
+      const outward = { x: Math.sin(radians), y: Math.cos(radians) }
+      const petal = leafOutline(
+        {
+          length: petalLength * 0.82,
+          width: Math.max(0.02, petalWidth * 0.8),
+          outline,
+          margin,
+          seed: `${seed}|inner|${i}`,
+          curve: 0.4,
+        },
+        10,
+      ).map((point: Point) => ({
+        x: centre.x + outward.x * petalLength * 0.22 + point.x * Math.cos(radians) + point.y * outward.x,
+        y: centre.y + outward.y * petalLength * 0.22 - point.x * Math.sin(radians) + point.y * outward.y,
+      }))
+      if (petal.length >= 3) out.push({ points: petal, fill: colours.petal })
+    }
+  }
 
   for (let i = 0; i < drawnStamens; i += 1) {
     const angle = phase2 + (i * 360) / drawnStamens

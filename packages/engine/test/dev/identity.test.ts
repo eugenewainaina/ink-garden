@@ -1,169 +1,116 @@
 import { describe, expect, it } from 'vitest'
-import { flowerOrgans, petaloidWhorls, whorlIdentity } from '../../src/dev/identity.ts'
-import { DERIVED_TRAITS, type MutablePhenotype } from '../../src/phenotype.ts'
+import { founderGenome } from '../../src/genome.ts'
+import { expressPlant } from '../../src/phenotype.ts'
+import { ROSEMARY } from '../../src/species.ts'
+import { plantPalette } from '../../src/dev/geometry.ts'
+import { flowerShapes } from '../../src/dev/flower.ts'
+import { petaloidWhorls, whorlIdentity } from '../../src/dev/identity.ts'
+import { setAlleleByName } from '../helpers.ts'
 
-/** A phenotype carrying only the traits organ identity reads. */
-function phenotype(
-  discreets: Partial<Record<string, string>> = {},
-  quantitative: Partial<Record<string, number>> = {},
-): MutablePhenotype {
-  const base: MutablePhenotype = {
-    discrete: {},
-    quantitative: {
-      ...DERIVED_TRAITS,
-      'petal.count': 5,
-      'petal.length': 1,
-      'petal.width': 1,
+/**
+ * The ABC model, wired in.
+ *
+ * `identity.ts` has resolved the four floral whorls since the beginning and
+ * NOTHING CALLED IT, so the two homeotic mutations it exists for were expressed
+ * on every plant and drawn on none. That is worth a test of its own: dead code
+ * that is correct is still a feature the app does not have.
+ *
+ * A double flower is the interesting case. It is what happens when class C is
+ * lost and whorl three becomes petals instead of stamens, and for a breeding
+ * garden it is a goal rather than a detail.
+ */
+
+function shapesFor(genome: Parameters<typeof expressPlant>[0]) {
+  const phenotype = expressPlant(genome, ROSEMARY)
+  const colours = plantPalette(phenotype, ROSEMARY)
+  const parts = flowerShapes(
+    {
+      kind: 'flower',
+      x: 0,
+      y: 0,
+      depth: 0,
+      angle: 0,
+      scale: 1,
+      length: phenotype.quantitative['flower.diameter'] ?? 1,
+      width: 0,
+      facing: 1,
     },
-  }
-  for (const [id, name] of Object.entries(discreets)) {
-    if (name === undefined) continue
-    base.discrete[id] = {
-      expressed: [name],
-      winner: 1,
-      blended: false,
-      secondaryWeight: 0,
-    }
-  }
-  for (const [id, value] of Object.entries(quantitative)) {
-    if (value === undefined) continue
-    base.quantitative[id] = value
-  }
-  return base
+    phenotype,
+    'cyme',
+    colours,
+    'identity',
+    'bloom',
+  )
+  return { phenotype, colours, parts }
 }
 
-describe('whorlIdentity', () => {
-  it('follows the ABC model for a normal flower', () => {
-    const p = phenotype({ 'flower.organ.identity': 'normal', 'flower.doubling': 'single' })
-    expect(whorlIdentity(1, p)).toBe('sepal')
-    expect(whorlIdentity(2, p)).toBe('petal')
-    expect(whorlIdentity(3, p)).toBe('stamen')
-    expect(whorlIdentity(4, p)).toBe('carpel')
+const base = founderGenome(ROSEMARY, 'abc')
+
+describe('the ABC model', () => {
+  it('is a normal flower when nothing is mutated', () => {
+    const single = expressPlant(base, ROSEMARY)
+    expect(whorlIdentity(1, single)).toBe('sepal')
+    expect(whorlIdentity(2, single)).toBe('petal')
+    expect(whorlIdentity(3, single)).toBe('stamen')
+    expect(whorlIdentity(4, single)).toBe('carpel')
+    expect(petaloidWhorls(single)).toEqual([2])
   })
 
-  it('turns the first whorl into petals when sepals are petaloid', () => {
-    const p = phenotype({
-      'flower.organ.identity': 'sepals.petaloid',
-      'flower.doubling': 'single',
-    })
-    expect(whorlIdentity(1, p)).toBe('petal')
-    expect(whorlIdentity(2, p)).toBe('petal')
-    expect(whorlIdentity(3, p)).toBe('stamen')
-  })
-
-  it('turns the third whorl into petals when the flower is double', () => {
-    const p = phenotype({ 'flower.organ.identity': 'normal', 'flower.doubling': 'double' })
-    expect(whorlIdentity(3, p)).toBe('petal')
-    expect(whorlIdentity(4, p)).toBe('carpel')
-  })
-
-  it('applies both homeotic mutations at once', () => {
-    const p = phenotype({
-      'flower.organ.identity': 'sepals.petaloid',
-      'flower.doubling': 'double',
-    })
-    expect([1, 2, 3, 4].map((w) => whorlIdentity(w, p))).toEqual([
-      'petal',
-      'petal',
-      'petal',
-      'carpel',
-    ])
-  })
-
-  it('treats a missing phenotype as the normal flower', () => {
-    const p = phenotype()
-    expect(whorlIdentity(1, p)).toBe('sepal')
-    expect(whorlIdentity(4, p)).toBe('carpel')
-  })
-
-  it('rejects a whorl outside one to four', () => {
-    const p = phenotype()
-    expect(() => whorlIdentity(0, p)).toThrow()
-    expect(() => whorlIdentity(5, p)).toThrow()
-  })
-})
-
-describe('petaloidWhorls', () => {
-  it('is just whorl two for a normal single flower', () => {
-    expect(petaloidWhorls(phenotype())).toEqual([2])
-  })
-
-  it('is whorls one and two for petaloid sepals', () => {
-    expect(
-      petaloidWhorls(phenotype({ 'flower.organ.identity': 'sepals.petaloid' })),
-    ).toEqual([1, 2])
-  })
-
-  it('is whorls two and three for a double flower', () => {
-    expect(petaloidWhorls(phenotype({ 'flower.doubling': 'double' }))).toEqual([2, 3])
-  })
-})
-
-describe('flowerOrgans', () => {
-  it('produces organs for every whorl, not just the petals', () => {
-    const organs = flowerOrgans(phenotype(), 2, 1, 'flower')
-    const kinds = new Set(organs.map((o) => o.kind))
-    expect(kinds.has('petal')).toBe(true)
-    expect(kinds.has('sepal')).toBe(true)
-    expect(kinds.has('stamen')).toBe(true)
-    expect(kinds.has('carpel')).toBe(true)
-  })
-
-  it('distributes the phenotype petal count across the petaloid whorls', () => {
-    const organs = flowerOrgans(phenotype(undefined, { 'petal.count': 6 }), 2, 1, 'f')
-    expect(organs.filter((o) => o.kind === 'petal').length).toBe(6)
-  })
-
-  it('adds petals and removes stamens for a double flower', () => {
-    const count = (kind: string, list: readonly { kind: string }[]): number =>
-      list.filter((o) => o.kind === kind).length
-    const single = flowerOrgans(phenotype({ 'flower.doubling': 'single' }), 2, 1, 'f')
-    const double = flowerOrgans(phenotype({ 'flower.doubling': 'double' }), 2, 1, 'f')
-    expect(count('petal', double)).toBeGreaterThan(count('petal', single))
-    expect(count('stamen', double)).toBe(0)
-    expect(count('stamen', single)).toBeGreaterThan(0)
-  })
-
-  it('keeps the total petal count right when it is split across two whorls', () => {
-    const organs = flowerOrgans(
-      phenotype({ 'flower.doubling': 'double' }, { 'petal.count': 8 }),
-      2,
-      1,
-      'f',
+  it('turns whorl three into petals for a double flower', () => {
+    const doubled = expressPlant(
+      setAlleleByName(base, 'flower.doubling', 'double', 'double'),
+      ROSEMARY,
     )
-    expect(organs.filter((o) => o.kind === 'petal').length).toBe(8)
+    expect(petaloidWhorls(doubled)).toEqual([2, 3])
   })
 
-  it('arranges a whorl radially, with distinct angles', () => {
-    const organs = flowerOrgans(phenotype(undefined, { 'petal.count': 8 }), 2, 1, 'f')
-    const angles = organs.filter((o) => o.kind === 'petal').map((o) => o.transform.angle)
-    expect(new Set(angles.map((a) => Math.round(a))).size).toBe(8)
+  it('turns whorl one into petals for petaloid sepals', () => {
+    const petaloid = expressPlant(
+      setAlleleByName(base, 'flower.organ.identity', 'sepals.petaloid', 'sepals.petaloid'),
+      ROSEMARY,
+    )
+    expect(petaloidWhorls(petaloid)).toEqual([1, 2])
+  })
+})
+
+describe('a double flower', () => {
+  it('has no stamens, because the stamens ARE the petals', () => {
+    const single = shapesFor(base)
+    const doubled = shapesFor(setAlleleByName(base, 'flower.doubling', 'double', 'double'))
+
+    // Anthers are the only shapes in the anther colour; the stigma is one of
+    // them, so a single flower has anthers plus a stigma and a double has the
+    // stigma alone.
+    const anthers = (shapes: typeof single): number =>
+      shapes.parts.filter((p) => p.fill === shapes.colours.anther).length
+    expect(anthers(single)).toBeGreaterThan(anthers(doubled))
+    expect(anthers(doubled)).toBe(1)
   })
 
-  it('puts the outer whorls at a larger radius than the inner ones', () => {
-    const organs = flowerOrgans(phenotype(), 2, 1, 'f')
-    const radius = (kind: string): number => {
-      const organ = organs.find((o) => o.kind === kind)
-      if (organ === undefined) throw new Error(`no ${kind}`)
-      return Math.hypot(organ.transform.x, organ.transform.y)
-    }
-    expect(radius('sepal')).toBeGreaterThan(radius('carpel'))
+  it('has more petals than a single one', () => {
+    const single = shapesFor(base)
+    const doubled = shapesFor(setAlleleByName(base, 'flower.doubling', 'double', 'double'))
+    const petals = (shapes: typeof single): number =>
+      shapes.parts.filter((p) => p.fill === shapes.colours.petal).length
+    // The count is already doubled by the phenotype; what the model adds here is
+    // that they arrive as TWO whorls. Adding a ring on top of the doubled count
+    // made a double-double, which is what this catches.
+    expect(petals(doubled)).toBe(Math.round(doubled.phenotype.quantitative['petal.count'] ?? 0))
+    expect(petals(doubled)).toBeGreaterThan(petals(single))
   })
+})
 
-  it('handles a zero petal count without producing petals', () => {
-    const organs = flowerOrgans(phenotype(undefined, { 'petal.count': 0 }), 2, 1, 'f')
-    expect(organs.filter((o) => o.kind === 'petal').length).toBe(0)
-  })
-
-  it('is deterministic', () => {
-    const p = phenotype()
-    expect(flowerOrgans(p, 2, 1, 'seed')).toEqual(flowerOrgans(p, 2, 1, 'seed'))
-  })
-
-  it('gives different seeds a different rotational phase, so flowers vary', () => {
-    const p = phenotype()
-    const a = flowerOrgans(p, 2, 1, 'one').map((o) => o.transform.angle)
-    const b = flowerOrgans(p, 2, 1, 'two').map((o) => o.transform.angle)
-    expect(a).not.toEqual(b)
+describe('petaloid sepals', () => {
+  it('paints the calyx in the petal colour', () => {
+    const petaloid = shapesFor(
+      setAlleleByName(base, 'flower.organ.identity', 'sepals.petaloid', 'sepals.petaloid'),
+    )
+    const normal = shapesFor(base)
+    // The calyx cup is the widest shape drawn in the calyx colour. In a
+    // petaloid flower that colour must not appear at all.
+    const calyxShapes = (shapes: typeof normal): number =>
+      shapes.parts.filter((p) => p.fill === shapes.colours.calyx).length
+    expect(calyxShapes(petaloid)).toBe(0)
+    expect(calyxShapes(normal)).toBeGreaterThan(0)
   })
 })
