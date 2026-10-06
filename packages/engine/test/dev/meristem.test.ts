@@ -167,6 +167,7 @@ describe('buildShoot', () => {
     divergenceDeg: 55,
     inflorescence: 'solitary',
     flowerSize: 1,
+    flowerStage: 'bloom',
     seed: 'shoot',
   }
 

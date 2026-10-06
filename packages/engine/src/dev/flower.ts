@@ -63,6 +63,7 @@ export function flowerShapes(
   inflorescence: string,
   colours: FlowerColours,
   seed: string,
+  stage: 'bud' | 'bloom' = 'bloom',
 ): readonly { readonly points: readonly Point[]; readonly fill: string }[] {
   const petals = Math.max(1, Math.round(phenotype.quantitative['petal.count'] ?? 5))
   const shapeTerm = phenotype.discrete['petal.shape']?.expressed[0] ?? 'rounded'
@@ -91,6 +92,41 @@ export function flowerShapes(
 
   const out: { points: readonly Point[]; fill: string }[] = []
   const centre = { x: organ.x, y: organ.y }
+
+  // ---- A bud ----
+  //
+  // A bud is the calyx closed over a corolla that has not expanded: a green
+  // ovoid with the folded petals showing as a tip at the end. No stamens and no
+  // stigma are visible, because in a real bud they are still inside. The bud
+  // points along +y, which in the flower's own frame is where the stem brings
+  // it from.
+  if (stage === 'bud') {
+    const width = Math.max(0.04, petalLength * 0.34)
+    const height = Math.max(0.06, petalLength * 0.62)
+    // The calyx, closed.
+    const body: Point[] = []
+    for (let i = 0; i < 14; i += 1) {
+      const radians = (i * 2 * Math.PI) / 14
+      body.push({
+        x: centre.x + width * Math.cos(radians),
+        y: centre.y + petalLength * 0.2 + height * Math.sin(radians),
+      })
+    }
+    out.push({ points: body, fill: colours.calyx })
+
+    // The folded corolla, showing at the tip.
+    const tipWidth = width * 0.62
+    const tip: Point[] = []
+    for (let i = 0; i < 12; i += 1) {
+      const radians = (i * 2 * Math.PI) / 12
+      tip.push({
+        x: centre.x + tipWidth * Math.cos(radians),
+        y: centre.y + petalLength * 0.2 + height * 0.92 + height * 0.3 * Math.sin(radians),
+      })
+    }
+    out.push({ points: tip, fill: colours.petal })
+    return out
+  }
 
   // `petal.count` is a phenotype trait capped for drawing: a head can carry
   // hundreds of florets and drawing every one of them at this scale adds

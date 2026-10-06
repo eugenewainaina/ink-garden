@@ -69,11 +69,14 @@ const parts: string[] = []
 const targetWidth = Number.parseInt(args['width'] ?? '1200', 10)
 const detail = Math.max(0.66, Math.min(1, 0.5 + (targetWidth / 1000) * 0.5))
 const precision = targetWidth >= 1000 ? 2 : 1
+// Which point in the plant's year to draw. The shoot used to ignore this, so a
+// vegetative plant and a flowering one were the same picture.
+const stage = args['stage'] ?? 'bloom'
 
 chosen.forEach((species, row) => {
   seeds.forEach((seed, col) => {
     const genome = founderGenome(species, seed)
-    const { shoot, phenotype, seed: plantSeed } = shootFor(genome, species)
+    const { shoot, phenotype, seed: plantSeed } = shootFor(genome, species, stage)
     const scene = sceneFromShoot(shoot, phenotype, species, plantSeed, { detail })
     const rendered = renderScene(scene, { padding: 16, precision })
 
@@ -129,7 +132,7 @@ writeFileSync(out, svg)
 process.stdout.write(`wrote ${out}: ${chosen.length} species x ${seedCount} seeds\n`)
 for (const species of chosen) {
   const genome = founderGenome(species, seeds[0] ?? 'x')
-  const { shoot, phenotype, seed: plantSeed } = shootFor(genome, species)
+  const { shoot, phenotype, seed: plantSeed } = shootFor(genome, species, stage)
   const scene = sceneFromShoot(shoot, phenotype, species, plantSeed, { detail })
   const structure = develop({ genome, species })
   process.stdout.write(

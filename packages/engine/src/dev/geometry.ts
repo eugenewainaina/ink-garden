@@ -335,7 +335,14 @@ export function sceneFromShoot(
     const lit = shade < 0.999
 
     if (organ.kind === 'flower') {
-      for (const part of flowerShapes(organ, phenotype, inflorescence, colours, `${seed}|${i}`)) {
+      for (const part of flowerShapes(
+        organ,
+        phenotype,
+        inflorescence,
+        colours,
+        `${seed}|${i}`,
+        shoot.flowerStage === 'bud' ? 'bud' : 'bloom',
+      )) {
         for (const point of part.points) include(point)
         shapes.push({
           role: 'flower',

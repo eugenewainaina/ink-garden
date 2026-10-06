@@ -20,8 +20,9 @@ export function grow(
   phenotype: Phenotype,
   species: SpeciesTemplate,
   seed: string,
+  stage = 'bloom',
 ): Shoot {
-  const geometry = shootGeometry(phenotype, species, seed)
+  const geometry = shootGeometry(phenotype, species, seed, stage)
   return growthFormOf(phenotype) === 'rosette'
     ? growRosette(geometry, seed)
     : buildShoot({ ...geometry, seed })
@@ -43,6 +44,7 @@ export function grow(
  * scape is the only vertical stem the plant ever makes.
  */
 export function growRosette(geometry: ShootGeometry, seed: string): Shoot {
+  const flowerStage = geometry.flowerStage
   const CROWN_LENGTH = 0.15
   // A crown is a stem, and a stem has width. Leaves attaching at one
   // mathematical point can only ever overlap, which is what made the first
@@ -61,7 +63,10 @@ export function growRosette(geometry: ShootGeometry, seed: string): Shoot {
   // Zealand gives 3 to 35 cm, and a plant whose head sits among its own leaves
   // is not one.
   const scapeLength = Math.max(geometry.leafLength * 1.2, geometry.internodeLength * 5)
-  if (scapeLength > 0 && geometry.flowerSize > 0) {
+  // A rosette only raises its scape when it is going to flower, which is the
+  // whole drama of a dandelion: nothing but leaves for months, then a stem and
+  // a head in a day.
+  if (flowerStage !== 'none' && scapeLength > 0 && geometry.flowerSize > 0) {
     internodes.push(
       makeOrgan('internode', { x: 0, y: CROWN_LENGTH, angle: 0, scale: 1 }, scapeLength, 0.12),
     )
@@ -109,5 +114,5 @@ export function growRosette(geometry: ShootGeometry, seed: string): Shoot {
 
   // A rosette does not branch. Offsets come from stolons or rhizomes, which are
   // other growth forms and not this one.
-  return { internodes, leaves, flowers, branches: [] }
+  return { internodes, leaves, flowers, flowerStage: geometry.flowerStage, branches: [] }
 }

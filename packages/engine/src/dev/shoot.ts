@@ -1,6 +1,7 @@
 import { normalisedTrait, type Phenotype } from '../phenotype.ts'
 import { expectedNormalised, type SpeciesTemplate } from '../species.ts'
 import type { Phyllotaxis } from './phyllotaxis.ts'
+import type { FlowerStage } from './meristem.ts'
 
 /** Everything the meristem needs to build a shoot, in physical units. */
 export interface ShootGeometry {
@@ -25,6 +26,8 @@ export interface ShootGeometry {
   readonly inflorescence: string
   /** Width of one flower or head, in centimetres. */
   readonly flowerSize: number
+  /** What the flowers are doing: none, closed, or open. */
+  readonly flowerStage: FlowerStage
 }
 
 /** The growth forms the engine implements. */
@@ -91,6 +94,7 @@ export function shootGeometry(
   phenotype: Phenotype,
   species: SpeciesTemplate,
   seed: string,
+  stage = 'bloom',
 ): ShootGeometry {
   const expressed = phenotype.discrete['phyllotaxis.pattern']?.expressed[0] ?? 'spiral'
   const pattern = PATTERNS.find((p) => p === expressed) ?? 'spiral'
@@ -140,6 +144,11 @@ export function shootGeometry(
   const divergenceDeg = form === 'rosette' ? 45 : 55
 
   const inflorescence = phenotype.discrete['inflorescence.type']?.expressed[0] ?? 'solitary'
+  // Phenology decides what the flowers are doing. Before `bloom` a plant has
+  // buds at most, and before `bud` it has nothing: a vegetative plant is
+  // leaves and stem, which is what most of its year looks like.
+  const flowerStage: FlowerStage =
+    stage === 'bloom' ? 'bloom' : stage === 'bud' ? 'bud' : 'none'
   // A head is sized by the capitulum; a simple flower by its corolla. Both come
   // from the species through the same baseline field, which is what lets a
   // dandelion's 3 to 5 cm head and a mint's 2.5 mm corolla be the same code.
@@ -153,6 +162,7 @@ export function shootGeometry(
     divergenceDeg,
     inflorescence,
     flowerSize,
+    flowerStage,
     internodeLength: phenotype.quantitative['internode.length'] ?? 1,
     leafLength: phenotype.quantitative['leaf.length'] ?? 1,
     leafWidth: phenotype.quantitative['leaf.width'] ?? 0.5,

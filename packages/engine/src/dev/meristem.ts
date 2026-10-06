@@ -113,6 +113,8 @@ export interface ShootConfig {
   readonly divergenceDeg: number
   /** Which inflorescence to build, from the phenotype. */
   readonly inflorescence: string
+  /** What the flowers are doing: none, closed, or open. */
+  readonly flowerStage: FlowerStage
   /** How wide one flower or head is, in centimetres. */
   readonly flowerSize: number
   readonly seed: string
@@ -126,6 +128,9 @@ export interface Branch {
   readonly shoot: Shoot
 }
 
+/** What a shoot's flowers are doing, from the phenology. */
+export type FlowerStage = 'none' | 'bud' | 'bloom'
+
 export interface Shoot {
   readonly internodes: readonly Organ[]
   readonly leaves: readonly Organ[]
@@ -136,6 +141,16 @@ export interface Shoot {
    * there are and where.
    */
   readonly flowers: readonly Organ[]
+  /**
+   * Whether those flowers are closed or open.
+   *
+   * A plant at `vegetative` carries none, at `bud` carries closed ones, and at
+   * `bloom` carries open ones. Until now the shoot ignored the phenological
+   * stage entirely, so a plant in January and the same plant in June were drawn
+   * identically, which is wrong for an app whose whole point is watching a
+   * plant go through its year.
+   */
+  readonly flowerStage: FlowerStage
   readonly branches: readonly Branch[]
 }
 
@@ -299,7 +314,13 @@ export function buildShoot(config: ShootConfig, depth = 0): Shoot {
     )
   }
 
-  return { internodes: phytomers.internodes, leaves: phytomers.leaves, flowers, branches }
+  return {
+    internodes: phytomers.internodes,
+    leaves: phytomers.leaves,
+    flowers: config.flowerStage === 'none' ? [] : flowers,
+    flowerStage: config.flowerStage,
+    branches,
+  }
 }
 
 /** A line from one point to another, in absolute plant coordinates, y upward. */

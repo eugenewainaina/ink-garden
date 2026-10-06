@@ -10,8 +10,9 @@ export interface DevelopInput {
   readonly genome: Genome
   readonly species: SpeciesTemplate
   /**
-   * Included for the specimen card, which promises a stage. Growth shape does
-   * not depend on it: a rosette is a rosette in January.
+   * The phenological stage, which decides what the flowers are doing: nothing
+   * before `bud`, closed buds at `bud`, open flowers at `bloom`. A vegetative
+   * plant is leaves and stem, which is what most of its year looks like.
    */
   readonly stage?: string
 }
@@ -26,10 +27,11 @@ export interface DevelopInput {
 export function shootFor(
   genome: Genome,
   species: SpeciesTemplate,
+  stage = 'bloom',
 ): { readonly shoot: Shoot; readonly phenotype: Phenotype; readonly seed: string } {
   const phenotype = expressPlant(genome, species)
   const seed = `${species.id}|${genomeId(genome)}`
-  return { shoot: grow(phenotype, species, seed), phenotype, seed }
+  return { shoot: grow(phenotype, species, seed, stage), phenotype, seed }
 }
 
 /**
@@ -44,7 +46,7 @@ export function shootFor(
  * plausibility score is a placeholder rather than a measurement.
  */
 export function develop(input: DevelopInput): Structure {
-  const { shoot } = shootFor(input.genome, input.species)
+  const { shoot } = shootFor(input.genome, input.species, input.stage)
   const projected = projectOrgans(placeOrgans(shoot), DEFAULT_TILT_DEG)
 
   const children: Organ[] = projected.map((organ) =>
