@@ -154,10 +154,15 @@ export function flowerShapes(
   // A capitulum reads as a disc because its ligules overlap heavily. Drawn as
   // thin spikes that barely touch, a dandelion looks like a sea urchin, which
   // is exactly what the first flower close-up showed.
-  // A doubled flower's petals belong to two whorls, so the total is split
-  // between the outer corolla and the converted inner whorl.
-  const outerPetals = stamensAsPetals ? Math.max(1, Math.round(petals / 2)) : petals
-  const innerPetals = stamensAsPetals ? Math.max(0, petals - outerPetals) : 0
+  // `petal.count` is the total for the FLOWER, not for one whorl, so it is
+  // shared across every whorl that turned petaloid. This is the same rule
+  // `flowerOrgans` in `identity.ts` applies, and it is not obvious: drawing the
+  // sepal count in whorl one and the petal count in whorl two gave eleven
+  // petals on a flower whose count is five.
+  const petalWhorlCount = Math.max(1, whorls.filter((w) => w === 1 || w === 2 || w === 3).length)
+  const perPetalWhorl = Math.max(0, Math.round(petals / petalWhorlCount))
+  const outerPetals = sepalsAsPetals || stamensAsPetals ? perPetalWhorl : petals
+  const innerPetals = stamensAsPetals ? perPetalWhorl : 0
   const drawn = Math.max(1, Math.min(isHead ? 96 : 12, outerPetals))
   const phase = (seed.length * 37) % 360
 
@@ -237,7 +242,12 @@ export function flowerShapes(
   const sepalCount = Math.max(2, Math.round(5 + normalisedTrait(phenotype, 'sepal.count') * 8))
   const sepalFraction = 0.18 + normalisedTrait(phenotype, 'sepal.length') * 0.34
   const sepalLength = petalLength * sepalFraction
-  const sepals = isHead ? Math.min(sepalCount, 16) : Math.min(sepalCount, 8)
+  // A petaloid sepal whorl carries its SHARE of the petals, not the sepal count.
+  const sepals = isHead
+    ? Math.min(sepalCount, 16)
+    : sepalsAsPetals
+      ? Math.max(1, Math.min(12, Math.round(petals / petalWhorlCount)))
+      : Math.min(sepalCount, 8)
 
   // A calyx is a CUP first and a set of lobes second. Bean's gives rosemary a
   // calyx that is "darker and purplish" but does not call it five free sepals;
@@ -252,7 +262,7 @@ export function flowerShapes(
     : centre
   const cupRadius = isHead ? petalLength * 0.62 : sepalLength * 0.78
   const cup = ellipse(cupCentre, cupRadius, cupRadius * (isHead ? 0.5 : 0.77), 14)
-  out.push({ points: cup, fill: sepalsAsPetals ? colours.petal : colours.calyx })
+  out.push({ points: cup, fill: colours.calyx })
 
   const phase0 = phase + 180 / sepals
   for (let i = 0; i < sepals; i += 1) {
