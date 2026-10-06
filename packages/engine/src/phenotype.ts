@@ -86,6 +86,16 @@ export const DERIVED_TRAITS: Readonly<Record<string, number>> = {
   'flower.fertility': 1,
 }
 
+/**
+ * The longest petiole a leaf may carry, as a fraction of its own length.
+ *
+ * Taken from the floras: a dandelion's leaf is drawn out into a hollow stalk
+ * that is a good quarter of its length, while a mint's is two millimetres on a
+ * four centimetre leaf. Nothing here is sessile by default, because most leaves
+ * are not.
+ */
+export const MAX_PETIOLE_FRACTION = 0.35
+
 /** How far a quantitative trait may move from its species baseline. */
 export const BASELINE_SPREAD = 0.5
 
@@ -181,7 +191,11 @@ const SCALED_BY_BASELINE: ReadonlyArray<{
   // leaf.width is NOT here. It is derived from the length and the species' own
   // proportions, because size and shape are separate axes and one baseline
   // cannot express both. See the leafAspect derivation below.
-  { trait: 'leaf.petiole', field: 'leafSize' },
+  // leaf.petiole is NOT here either, and for the same reason as leaf.width: a
+  // petiole is a PROPORTION of the leaf it belongs to, not an absolute size. It
+  // was scaled by leafSize, which made it a second copy of the leaf's own
+  // length, so rosemary came out with a 3 cm "petiole" on a 2.6 cm leaf. The
+  // fraction is applied to the leaf below.
   { trait: 'flower.diameter', field: 'flowerSize' },
   { trait: 'petal.length', field: 'flowerSize' },
   { trait: 'petal.width', field: 'flowerSize' },
@@ -234,6 +248,14 @@ export function expressPlant(
     const variation = 0.75 + 0.5 * normalised(phenotype, 'leaf.width')
     phenotype.quantitative['leaf.width'] = length / (aspect * variation)
   }
+
+  // The petiole, as a fraction of the leaf it carries. A stalk is a proportion:
+  // a long leaf does not have a proportionally longer stalk, and a species
+  // either has one or does not.
+  phenotype.quantitative['leaf.petiole'] =
+    (phenotype.quantitative['leaf.length'] ?? 0) *
+    normalised(phenotype, 'leaf.petiole') *
+    MAX_PETIOLE_FRACTION
 
   // Internode length: the allometric relation with stature, then the species'
   // own packing density. A dense shrub has short internodes and therefore many

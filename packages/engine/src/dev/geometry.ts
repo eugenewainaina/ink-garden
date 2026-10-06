@@ -338,6 +338,13 @@ export function sceneFromShoot(
   const colours = plantPalette(phenotype, species)
   // A faint edge on every petal. Not part of the palette: it is an outline, and
   // a white corolla on pale paper is invisible without one.
+  // A petiole is stem tissue and lighter than the blade, which is how it reads
+  // on all four species: a pale stalk under a dark leaf.
+  const petioleFill = hsvToHex(
+    species.baseline.leafHue - 14,
+    Math.max(0.08, species.baseline.leafSaturation * 0.72),
+    Math.min(0.86, species.baseline.leafLightness * 1.26),
+  )
   const petalEdge = hsvToHex(
     (phenotype.quantitative['pigment.hue'] ?? 40) - 20,
     Math.min(1, (phenotype.quantitative['pigment.saturation'] ?? 0.5) + 0.2),
@@ -398,6 +405,39 @@ export function sceneFromShoot(
         organ.length * foreshortening * 0.16,
       )
 
+      // The petiole: the stalk a leaf is carried on.
+      //
+      // It is a FRACTION of the leaf rather than a size, so it scales with the
+      // blade it belongs to, and it is zero on a sessile leaf. Bean's gives
+      // rosemary "not stalked" and PlantNET gives jacaranda's pinnules as
+      // "sessile", so two of these species correctly draw no stalk at all.
+      const petioleFraction =
+        (phenotype.quantitative['leaf.petiole'] ?? 0) /
+        Math.max(1e-6, phenotype.quantitative['leaf.length'] ?? 1)
+      const petioleDrawn = drawnLength * petioleFraction
+      if (petioleDrawn > 0.02) {
+        const stalk = taperedStroke(
+          [
+            { x: 0, y: 0 },
+            { x: 0, y: petioleDrawn * 0.5 },
+            { x: 0, y: petioleDrawn },
+          ],
+          POINTED_TAPER,
+          // Narrower than the stem it leaves, which is what a petiole is: a
+          // stem's cross-section narrowed to carry one blade.
+          Math.max(0.02, baseRadius * 0.42),
+        )
+        if (stalk.length >= 3) {
+          const placed = stalk.map(place)
+          for (const point of placed) include(point)
+          shapes.push({
+            role: 'leaf',
+            points: placed,
+            fill: lit ? shadeHex(petioleFill, shade) : petioleFill,
+          })
+        }
+      }
+
       // One lamina for a simple leaf; a rachis and its leaflets for a compound
       // one. A rachis is a lamina with almost no width, so this stays one path
       // rather than two.
@@ -408,7 +448,8 @@ export function sceneFromShoot(
         const laminaCos = Math.cos(theta)
         const laminaSin = Math.sin(theta)
         const baseX = lamina.offset.x * drawnLength
-        const baseY = lamina.offset.y * drawnLength
+        // The blade sits at the far end of its stalk.
+        const baseY = lamina.offset.y * drawnLength + petioleDrawn
 
         const local = leafOutline(
           {

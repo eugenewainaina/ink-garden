@@ -199,6 +199,8 @@ export const ROSEMARY: SpeciesTemplate = {
     'branch.angle.a': [0.4, 0.6],
     'branch.angle.b': [0.4, 0.6],
     'stem.pigment': [0.25, 0.75],
+    // not stalked
+    'leaf.petiole': [1, 0],
     'thorn.presence': [0.05, 0.95],
     'inflorescence.type': [0, 0, 0, 0, 0, 0, 0, 1],
     'flower.symmetry': [0, 1],
@@ -269,6 +271,8 @@ export const DANDELION: SpeciesTemplate = {
     // A dandelion has one scape and does not branch. Nearly total dominance.
     'branch.apical_dominance.a': [0.03, 0.97],
     'branch.apical_dominance.b': [0.03, 0.97],
+    // petiole hollow
+    'leaf.petiole': [0.4, 0.6],
     'thorn.presence': [1, 0],
     'inflorescence.type': [0.04, 0, 0, 0, 0, 0, 0.96, 0],
     'flower.symmetry': [1, 0],
@@ -327,6 +331,8 @@ export const SPEARMINT: SpeciesTemplate = {
     'branch.apical_dominance.a': [0.15, 0.85],
     'branch.apical_dominance.b': [0.15, 0.85],
     'stem.pigment': [1, 0],
+    // petiole absent to 2 mm
+    'leaf.petiole': [0.88, 0.12],
     'thorn.presence': [1, 0],
     'inflorescence.type': [0, 0.95, 0, 0, 0, 0, 0, 0.05],
     'flower.symmetry': [0, 1],
@@ -392,6 +398,8 @@ export const JACARANDA: SpeciesTemplate = {
     'branch.apical_dominance.b': [0.1, 0.9],
     'branch.angle.a': [0.3, 0.7],
     'branch.angle.b': [0.3, 0.7],
+    // sessile
+    'leaf.petiole': [1, 0],
     'thorn.presence': [0.96, 0.04],
     'inflorescence.type': [0.05, 0, 0.05, 0.9, 0, 0, 0, 0],
     'flower.symmetry': [0, 1],
